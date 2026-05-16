@@ -7,13 +7,13 @@
     <meta name="theme-color" content="#0e1514" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
-      content="Cuide da postura no home office. App desktop que monitora pela webcam, 100% local."
+      content="Postura Trabalho. App de desktop que olha sua postura no home office. Licença vitalícia por R$ 99."
     />
     <meta property="og:site_name" content="Postura Trabalho" />
-    <meta property="og:title" content="Postura Trabalho — para quem trabalha em casa" />
+    <meta property="og:title" content="Postura Trabalho. Postura no eixo, sem você notar." />
     <meta
       property="og:description"
-      content="App desktop que monitora sua postura no home office pela webcam. Sem nuvem, sem ruído — só um aviso sutil quando você desliza."
+      content="App de desktop que olha sua postura no home office pela webcam, 100% local. Vitalício por R$ 99."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://postura-trabalho.vercel.app/" />
@@ -24,15 +24,11 @@
     />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="Pessoa trabalhando em home office com setup minimalista — Postura Trabalho"
-    />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Postura Trabalho — para quem trabalha em casa" />
+    <meta name="twitter:title" content="Postura Trabalho. Postura no eixo, sem você notar." />
     <meta
       name="twitter:description"
-      content="App desktop que monitora sua postura no home office pela webcam. 100% local."
+      content="App de desktop que olha sua postura no home office. 100% local. R$ 99 vitalício."
     />
     <meta
       name="twitter:image"
@@ -49,7 +45,7 @@
     />
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
-    <title>Postura Trabalho — Para quem trabalha em casa</title>
+    <title>Postura Trabalho. Postura no eixo, sem você notar.</title>
   </head>
   <body>
     <div class="app-shell">
@@ -59,19 +55,10 @@
           <h1 class="app-bar__title">Postura Trabalho</h1>
         </a>
         <div class="app-bar__actions">
-          <span class="app-bar__badge" id="version-pill" aria-live="polite">
-            <span class="app-bar__badge-dot" aria-hidden="true"></span>
-            <span id="version-pill-text">carregando…</span>
-          </span>
-          <a
-            class="icon-button"
-            href="https://github.com/jvlustosa/postura-trabalho"
-            target="_blank"
-            rel="noopener"
-            aria-label="Ver no GitHub"
-            title="GitHub"
-          >
-            <i data-lucide="github"></i>
+          <a class="app-bar__link" href="#como-funciona">Como funciona</a>
+          <a class="app-bar__link" href="#preco">Preço</a>
+          <a class="button button--filled app-bar__cta" href="#comprar">
+            Comprar
           </a>
         </div>
       </header>
@@ -81,45 +68,39 @@
           <div class="hero__copy">
             <span class="eyebrow">
               <i data-lucide="home" aria-hidden="true"></i>
-              <span>Para quem trabalha em casa</span>
+              <span>Pra quem trabalha de casa</span>
             </span>
             <h2 id="hero-title" class="hero__title">
-              Sua postura,<br />
-              cuidada em silêncio.
+              Postura no eixo,<br />
+              sem você notar.
             </h2>
             <p class="hero__lead">
-              App desktop que monitora sua postura no home office pela webcam. Sem
-              nuvem, sem alerta exagerado — só um aviso sutil quando você desliza.
+              Um app de desktop que fica de olho na sua postura enquanto você trabalha.
+              Roda na sua webcam, do seu jeito, sem mandar nada pra nuvem.
             </p>
 
             <div class="hero__cta">
-              <a
-                id="primary-download"
-                class="button button--filled button--cta"
-                href="https://github.com/jvlustosa/postura-trabalho/releases/latest"
-                target="_blank"
-                rel="noopener"
-              >
-                <i data-lucide="download" aria-hidden="true"></i>
-                <span id="primary-download-label">Baixar para Desktop</span>
+              <a class="button button--filled button--cta" href="#comprar">
+                <i data-lucide="sparkles" aria-hidden="true"></i>
+                <span>Quero pelo lifetime de R$ 99</span>
               </a>
-              <p class="hero__hint" id="download-hint" aria-live="polite">
-                Detectando seu sistema…
+              <p class="hero__hint">
+                Paga uma vez, usa pra sempre. Windows, Linux e macOS.
               </p>
             </div>
 
             <ul class="hero__features" role="list">
               <li class="feature-item">
                 <i data-lucide="shield-check" aria-hidden="true"></i>
-                <span>100% local</span>
+                <span>Roda local</span>
               </li>
               <li class="feature-item">
                 <i data-lucide="zap" aria-hidden="true"></i>
-                <span>Leve no PC</span>
+                <span>Levinho no PC</span>
               </li>
               <li class="feature-item">
                 <i data-lucide="bell-off" aria-hidden="true"></i>
-                <span>Sem ruído</span>
+                <span>Sem barulhinho</span>
               </li>
             </ul>
           </div>
@@ -148,43 +129,39 @@
           </div>
         </section>
 
-        <section class="card download-panel" aria-labelledby="download-title">
-          <header class="panel-header">
-            <h3 id="download-title" class="panel-title">Escolher plataforma</h3>
-            <p class="panel-subtitle">Detectamos seu sistema, mas você pode trocar.</p>
+        <section class="section" aria-labelledby="platforms-title">
+          <header class="section__head">
+            <span class="eyebrow eyebrow--plain">Plataformas</span>
+            <h3 id="platforms-title" class="section__title">Roda no seu sistema</h3>
+            <p class="section__subtitle">
+              Instalador nativo pra cada sistema. Mesma licença, mesmo app, em qualquer
+              um deles.
+            </p>
           </header>
 
-          <div class="os-tabs" role="tablist" aria-label="Sistema operacional">
-            <button type="button" class="os-tab" data-os="windows" role="tab" aria-selected="false">
-              <i data-lucide="monitor" aria-hidden="true"></i>
-              <span>Windows</span>
-            </button>
-            <button type="button" class="os-tab" data-os="linux" role="tab" aria-selected="false">
-              <i data-lucide="terminal" aria-hidden="true"></i>
-              <span>Linux</span>
-            </button>
-            <button type="button" class="os-tab" data-os="mac" role="tab" aria-selected="false">
-              <i data-lucide="laptop" aria-hidden="true"></i>
-              <span>macOS</span>
-            </button>
+          <div class="platforms">
+            <div class="platform-card">
+              <span class="platform-card__icon brand-icon brand-icon--windows" aria-hidden="true"></span>
+              <h4 class="platform-card__title">Windows</h4>
+              <p class="platform-card__copy">Instalador e versão portátil. Roda do Windows 10 pra cima.</p>
+            </div>
+            <div class="platform-card">
+              <span class="platform-card__icon brand-icon brand-icon--linux" aria-hidden="true"></span>
+              <h4 class="platform-card__title">Linux</h4>
+              <p class="platform-card__copy">AppImage que roda em qualquer distro, e .deb pra Debian e Ubuntu.</p>
+            </div>
+            <div class="platform-card">
+              <span class="platform-card__icon brand-icon brand-icon--apple" aria-hidden="true"></span>
+              <h4 class="platform-card__title">macOS</h4>
+              <p class="platform-card__copy">Tá vindo. Sua licença já cobre quando essa versão sair.</p>
+            </div>
           </div>
-
-          <div class="os-panel" id="os-panel" aria-live="polite"></div>
-
-          <p class="panel-note">
-            <i data-lucide="info" aria-hidden="true"></i>
-            <span>
-              No Windows o SmartScreen pode mostrar um alerta (o app ainda não tem
-              assinatura digital). Clique em <strong>Mais informações</strong> →
-              <strong>Executar assim mesmo</strong>.
-            </span>
-          </p>
         </section>
 
-        <section class="card" aria-labelledby="howto-title">
-          <header class="panel-header">
-            <h3 id="howto-title" class="panel-title">Como funciona</h3>
-            <p class="panel-subtitle">Três passos. Depois disso ele cuida sozinho.</p>
+        <section class="section" id="como-funciona" aria-labelledby="howto-title">
+          <header class="section__head">
+            <span class="eyebrow eyebrow--plain">Como funciona</span>
+            <h3 id="howto-title" class="section__title">Três passos. Depois ele cuida sozinho.</h3>
           </header>
 
           <ol class="steps">
@@ -193,8 +170,8 @@
                 <i data-lucide="download" aria-hidden="true"></i>
               </span>
               <div class="step__text">
-                <h4>Baixe e instale</h4>
-                <p>Instalador leve para o seu sistema, sem cadastro.</p>
+                <h4>Compra e baixa</h4>
+                <p>Você recebe o instalador no e-mail logo depois do pagamento.</p>
               </div>
             </li>
             <li class="step">
@@ -202,8 +179,8 @@
                 <i data-lucide="camera" aria-hidden="true"></i>
               </span>
               <div class="step__text">
-                <h4>Calibre rápido</h4>
-                <p>Sente confortavelmente. Em segundos ele aprende sua postura ideal.</p>
+                <h4>Calibra rapidinho</h4>
+                <p>Senta confortável. Em segundos ele aprende a sua postura ideal.</p>
               </div>
             </li>
             <li class="step">
@@ -211,46 +188,118 @@
                 <i data-lucide="briefcase" aria-hidden="true"></i>
               </span>
               <div class="step__text">
-                <h4>Trabalhe normalmente</h4>
-                <p>Monitora em segundo plano e avisa só quando precisa.</p>
+                <h4>Trabalha tranquilo</h4>
+                <p>Ele fica em segundo plano. Só avisa quando você desliza de verdade.</p>
               </div>
             </li>
           </ol>
         </section>
 
+        <section class="section" id="preco" aria-labelledby="price-title">
+          <header class="section__head section__head--center">
+            <span class="eyebrow eyebrow--plain">Preço</span>
+            <h3 id="price-title" class="section__title">Uma licença, pra vida toda.</h3>
+            <p class="section__subtitle">
+              Sem assinatura, sem cobrança nova depois. Paga uma vez e usa nos seus
+              computadores.
+            </p>
+          </header>
+
+          <div class="price-card" id="comprar">
+            <div class="price-card__tag">
+              <i data-lucide="sparkles" aria-hidden="true"></i>
+              <span>Preço de lançamento</span>
+            </div>
+            <div class="price-card__amount">
+              <span class="price-card__currency">R$</span>
+              <span class="price-card__value">99</span>
+              <span class="price-card__period">lifetime</span>
+            </div>
+            <p class="price-card__lead">
+              Pagou, é seu pra sempre. Atualizações futuras de graça.
+            </p>
+
+            <ul class="price-card__list">
+              <li>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Windows, Linux e macOS (quando sair)</span>
+              </li>
+              <li>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Todas as atualizações futuras inclusas</span>
+              </li>
+              <li>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Detecção de postura 100% no seu PC</span>
+              </li>
+              <li>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Calibragem do seu jeito e histórico</span>
+              </li>
+              <li>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Sem cadastro chato, sem rastreio</span>
+              </li>
+            </ul>
+
+            <a class="button button--filled button--cta price-card__cta" href="#" data-checkout>
+              <i data-lucide="sparkles" aria-hidden="true"></i>
+              <span>Comprar agora por R$ 99</span>
+            </a>
+
+            <p class="price-card__small">
+              Depois do pagamento, instalador e chave chegam no seu e-mail.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="faq-title">
+          <header class="section__head">
+            <span class="eyebrow eyebrow--plain">Dúvidas</span>
+            <h3 id="faq-title" class="section__title">Perguntas frequentes</h3>
+          </header>
+
+          <div class="faq">
+            <details class="faq__item">
+              <summary>
+                <span>É vitalício mesmo?</span>
+                <i data-lucide="chevron-down" aria-hidden="true"></i>
+              </summary>
+              <p>É sim. Um pagamento único de R$ 99 e a licença é sua pra sempre, com as atualizações futuras inclusas.</p>
+            </details>
+            <details class="faq__item">
+              <summary>
+                <span>Dá pra instalar em mais de um computador?</span>
+                <i data-lucide="chevron-down" aria-hidden="true"></i>
+              </summary>
+              <p>Dá. Até 3 computadores do mesmo usuário.</p>
+            </details>
+            <details class="faq__item">
+              <summary>
+                <span>O app manda imagens pra algum servidor?</span>
+                <i data-lucide="chevron-down" aria-hidden="true"></i>
+              </summary>
+              <p>Não. Tudo roda local no seu PC. Nenhum frame da webcam sai da sua máquina.</p>
+            </details>
+            <details class="faq__item">
+              <summary>
+                <span>E se eu não gostar?</span>
+                <i data-lucide="chevron-down" aria-hidden="true"></i>
+              </summary>
+              <p>Garantia de 7 dias. Você pede e a gente devolve, sem fazer drama.</p>
+            </details>
+          </div>
+        </section>
+
         <footer class="app-foot">
           <div class="app-foot__brand">
             <img src="./assets/logo.png" alt="" />
-            <span>Postura Trabalho</span>
-          </div>
-          <div class="app-foot__credit">
-            Foto:
-            <a
-              href="https://www.pexels.com/photo/5198249/"
-              target="_blank"
-              rel="noopener"
-              >Tima Miroshnichenko / Pexels</a
-            >
+            <span>Postura Trabalho · © 2026</span>
           </div>
           <div class="app-foot__links">
-            <a
-              href="https://github.com/jvlustosa/postura-trabalho"
-              target="_blank"
-              rel="noopener"
-              >GitHub</a
-            >
-            <a
-              href="https://github.com/jvlustosa/postura-trabalho/releases"
-              target="_blank"
-              rel="noopener"
-              >Releases</a
-            >
-            <a
-              href="https://github.com/jvlustosa/postura-trabalho/issues"
-              target="_blank"
-              rel="noopener"
-              >Reportar bug</a
-            >
+            <a href="#preco">Preço</a>
+            <a href="#comprar">Comprar</a>
+            <a href="mailto:contato@posturatrabalho.com">Suporte</a>
           </div>
         </footer>
       </main>
