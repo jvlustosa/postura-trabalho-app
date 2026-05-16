@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 import {
   Activity,
   Clock,
@@ -13,12 +13,17 @@ import { PostureCheck } from './components/PostureCheck';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimelineView } from './components/TimelineView';
 import { useSettings } from './lib/settings/useSettings';
+import { hydrateTimeline } from './lib/timeline/storage';
 
 type View = 'idle' | 'active' | 'settings' | 'timeline';
 
 export const App = (): ReactElement => {
   const { settings, update } = useSettings();
   const [view, setView] = useState<View>('idle');
+
+  useEffect(() => {
+    void hydrateTimeline();
+  }, []);
 
   if (!settings.onboardingCompleted) {
     return (

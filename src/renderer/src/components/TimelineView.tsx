@@ -91,7 +91,15 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
   const [now, setNow] = useState<number>(() => Date.now());
 
   useEffect(() => {
+    let cancelled = false;
+    void hydrateTimeline().then((loaded) => {
+      if (cancelled) return;
+      setSegments(loaded);
+    });
     setSegments(loadTimeline());
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

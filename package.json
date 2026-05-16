@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "copy:mediapipe": "node scripts/copy-mediapipe-assets.mjs"
+    "copy:mediapipe": "node scripts/copy-mediapipe-assets.mjs",
+    "install:linux": "bash scripts/install-linux-appimage.sh"
   },
   "keywords": [],
   "author": {
