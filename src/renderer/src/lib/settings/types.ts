@@ -1,7 +1,7 @@
 import type { PostureThresholds } from '../posture/types';
 
 export type SensitivityLevel = 'relaxed' | 'standard' | 'strict';
-export type AlertThresholdSeconds = 30 | 60 | 120 | 300;
+export type AlertThresholdSeconds = 30 | 60 | 120 | 180;
 
 export interface CalibrationData {
   thresholds: PostureThresholds;
@@ -29,6 +29,7 @@ export interface AppSettings {
   alertThresholdSeconds: AlertThresholdSeconds;
   floatingWindow: boolean;
   compactMode: boolean;
+  autoStart: boolean;
 }
 
 export const defaultSettings: AppSettings = {
@@ -40,7 +41,8 @@ export const defaultSettings: AppSettings = {
   screenHeight: 50,
   calibration: null,
   alertsEnabled: true,
-  alertThresholdSeconds: 60,
+  alertThresholdSeconds: 120,
   floatingWindow: false,
   compactMode: false,
+  autoStart: false,
 };

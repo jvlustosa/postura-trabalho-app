@@ -1,7 +1,11 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
+import { Camera, ShieldCheck } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
+import { buildCameraDiagnosticReport } from '../lib/media/buildCameraDiagnosticReport';
+import { classifyMediaError, formatMediaErrorDetails } from '../lib/media/classifyMediaError';
 import { createPoseLandmarker } from '../lib/pose/createPoseLandmarker';
+import { drawPoseOverlay } from '../lib/pose/poseOverlay';
 import { mapPoseLandmarks } from '../lib/pose/mapPoseLandmarks';
 import { analyzePosture } from '../lib/posture/analyzePosture';
 import { createPersonalizedThresholds } from '../lib/posture/createPersonalizedThresholds';
@@ -14,7 +18,7 @@ interface CalibrationStepProps {
   onSkip: () => void;
 }
 
-type Phase = 'preparing' | 'sampling' | 'done' | 'error';
+type Phase = 'consent' | 'preparing' | 'sampling' | 'done' | 'error';
 
 type ErrorReason =
   | 'permission-denied'
@@ -24,6 +28,17 @@ type ErrorReason =
   | 'model-failed'
   | 'no-samples'
   | 'unknown';
+
+type MediaReason = 'permission-denied' | 'no-camera' | 'camera-in-use' | 'unsupported' | 'unknown';
+
+const CALIBRATION_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
+  video: {
+    width: { ideal: 640 },
+    height: { ideal: 480 },
+    frameRate: { ideal: 15, max: 30 },
+  },
+  audio: false,
+};
 
 interface ErrorCopy {
   title: string;
@@ -69,31 +84,7 @@ const ERROR_COPY: Record<ErrorReason, ErrorCopy> = {
   },
 };
 
-const classifyMediaError = (error: unknown): ErrorReason => {
-  if (!(error instanceof Error)) {
-    return 'unknown';
-  }
-
-  const name = error.name;
-
-  if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return 'permission-denied';
-  }
-
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-    return 'no-camera';
-  }
-
-  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') {
-    return 'camera-in-use';
-  }
-
-  if (name === 'TypeError') {
-    return 'unsupported';
-  }
-
-  return 'unknown';
-};
+const toErrorReason = (mediaReason: MediaReason): ErrorReason => mediaReason;
 
 export const CalibrationStep = ({
   durationSeconds,
@@ -101,22 +92,63 @@ export const CalibrationStep = ({
   onSkip,
 }: CalibrationStepProps): ReactElement => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const frameRef = useRef<number | null>(null);
   const samplesRef = useRef<PostureAnalysis['metrics'][]>([]);
   const startedAtRef = useRef<number | null>(null);
-  const [phase, setPhase] = useState<Phase>('preparing');
+  const [hasStarted, setHasStarted] = useState<boolean>(false);
+  const [phase, setPhase] = useState<Phase>('consent');
   const [secondsLeft, setSecondsLeft] = useState<number>(durationSeconds);
   const [progress, setProgress] = useState<number>(0);
   const [errorReason, setErrorReason] = useState<ErrorReason>('unknown');
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState<number>(0);
+  const [copyDiagFeedback, setCopyDiagFeedback] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const diagnosticCaptureRef = useRef<{ error?: unknown; stream?: MediaStream | null }>({});
+
+  const beginCalibration = useCallback((): void => {
+    diagnosticCaptureRef.current = {};
+    setErrorDetails(null);
+    setHasStarted(true);
+  }, []);
 
   const retry = useCallback((): void => {
+    diagnosticCaptureRef.current = {};
+    setErrorDetails(null);
     setRetryToken((token) => token + 1);
   }, []);
 
+  const copyDetailedLogs = useCallback(async (): Promise<void> => {
+    const { error, stream } = diagnosticCaptureRef.current;
+    const title = ERROR_COPY[errorReason].title;
+    try {
+      const text = await buildCameraDiagnosticReport(error, {
+        surface: 'calibration',
+        uiMessage: title,
+        constraints: CALIBRATION_MEDIA_CONSTRAINTS,
+        video: videoRef.current,
+        stream: stream ?? streamRef.current,
+        extraNotes:
+          errorReason === 'no-samples'
+            ? 'Calibração encerrada sem amostras suficientes de pose.'
+            : undefined,
+      });
+      await navigator.clipboard.writeText(text);
+      setCopyDiagFeedback('copied');
+      window.setTimeout(() => setCopyDiagFeedback('idle'), 2500);
+    } catch {
+      setCopyDiagFeedback('failed');
+      window.setTimeout(() => setCopyDiagFeedback('idle'), 2500);
+    }
+  }, [errorReason]);
+
   useEffect(() => {
+    if (!hasStarted) {
+      return;
+    }
+
     let cancelled = false;
     const durationMs = durationSeconds * 1_000;
     setPhase('preparing');
@@ -139,8 +171,11 @@ export const CalibrationStep = ({
         console.warn('[calibration] failed', reason, error);
       }
 
+      diagnosticCaptureRef.current = { error, stream: streamRef.current };
+
       stopStream();
       setErrorReason(reason);
+      setErrorDetails(error !== undefined ? formatMediaErrorDetails(error) : null);
       setPhase('error');
     };
 
@@ -204,8 +239,21 @@ export const CalibrationStep = ({
         const startedAt = startedAtRef.current ?? now;
         startedAtRef.current = startedAt;
         const result = landmarker.detectForVideo(video, now);
-        const landmarks = mapPoseLandmarks(result.landmarks[0]);
+        const poseLandmarks = result.landmarks[0];
+        const landmarks = mapPoseLandmarks(poseLandmarks);
         const analysis = analyzePosture(landmarks);
+
+        const overlay = overlayRef.current;
+        if (overlay) {
+          const bounds = overlay.getBoundingClientRect();
+          drawPoseOverlay(overlay, poseLandmarks, {
+            viewportWidth: bounds.width,
+            viewportHeight: bounds.height,
+            sourceWidth: video.videoWidth || 640,
+            sourceHeight: video.videoHeight || 480,
+            pixelRatio: window.devicePixelRatio || 1,
+          });
+        }
 
         if (analysis.state !== 'calibrating') {
           samplesRef.current.push(analysis.metrics);
@@ -230,6 +278,8 @@ export const CalibrationStep = ({
     };
 
     const start = async (): Promise<void> => {
+      diagnosticCaptureRef.current = {};
+
       if (!navigator.mediaDevices?.getUserMedia) {
         failWith('unsupported');
 
@@ -239,16 +289,9 @@ export const CalibrationStep = ({
       let stream: MediaStream;
 
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            frameRate: { ideal: 15, max: 30 },
-          },
-          audio: false,
-        });
+        stream = await navigator.mediaDevices.getUserMedia(CALIBRATION_MEDIA_CONSTRAINTS);
       } catch (error) {
-        failWith(classifyMediaError(error), error);
+        failWith(toErrorReason(classifyMediaError(error)), error);
 
         return;
       }
@@ -267,7 +310,7 @@ export const CalibrationStep = ({
           await videoRef.current.play();
         }
       } catch (error) {
-        failWith('camera-in-use', error);
+        failWith(toErrorReason(classifyMediaError(error)) === 'unknown' ? 'camera-in-use' : toErrorReason(classifyMediaError(error)), error);
 
         return;
       }
@@ -284,6 +327,7 @@ export const CalibrationStep = ({
         return;
       }
 
+      diagnosticCaptureRef.current = {};
       setPhase('sampling');
       startedAtRef.current = performance.now();
       frameRef.current = requestAnimationFrame(tick);
@@ -304,7 +348,7 @@ export const CalibrationStep = ({
       samplesRef.current = [];
       startedAtRef.current = null;
     };
-  }, [durationSeconds, onCalibrated, retryToken]);
+  }, [durationSeconds, onCalibrated, retryToken, hasStarted]);
 
   const errorCopy = ERROR_COPY[errorReason];
 
@@ -312,6 +356,7 @@ export const CalibrationStep = ({
     <div className="calibration-step">
       <div className="calibration-step__stage">
         <video ref={videoRef} className="calibration-step__video" muted playsInline />
+        <canvas ref={overlayRef} className="calibration-step__overlay-canvas" aria-hidden="true" />
         {phase === 'sampling' ? (
           <>
             <div className="calibration-step__countdown" aria-live="polite">
@@ -331,6 +376,15 @@ export const CalibrationStep = ({
               />
             </div>
           </>
+        ) : null}
+        {phase === 'consent' ? (
+          <div className="calibration-step__overlay calibration-step__overlay--consent">
+            <Camera size={32} aria-hidden="true" className="calibration-step__overlay-icon" />
+            <span className="calibration-step__overlay-text">Permita o acesso à câmera</span>
+            <span className="calibration-step__overlay-sub">
+              Vamos ler sua postura sem enviar imagens para fora deste dispositivo.
+            </span>
+          </div>
         ) : null}
         {phase === 'preparing' ? (
           <div className="calibration-step__overlay">
@@ -352,13 +406,56 @@ export const CalibrationStep = ({
         ) : null}
       </div>
 
+      {phase === 'error' ? (
+        <>
+          <div className="calibration-step__diag-actions">
+            <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
+              Copiar logs detalhados
+            </button>
+            {copyDiagFeedback === 'copied' ? (
+              <span className="calibration-step__diag-feedback" aria-live="polite">
+                Copiado para a área de transferência
+              </span>
+            ) : null}
+            {copyDiagFeedback === 'failed' ? (
+              <span className="calibration-step__diag-feedback" aria-live="polite">
+                Não foi possível copiar automaticamente
+              </span>
+            ) : null}
+          </div>
+          {errorDetails ? (
+            <details className="calibration-step__error-details">
+              <summary>Resumo do erro (copiar)</summary>
+              <pre className="calibration-step__error-pre">{errorDetails}</pre>
+              <button
+                type="button"
+                className="button button--text"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(errorDetails).catch(() => undefined);
+                }}
+              >
+                Copiar resumo
+              </button>
+            </details>
+          ) : null}
+        </>
+      ) : null}
+
       <p className="calibration-step__hint">
         {phase === 'error'
           ? errorCopy.hint
-          : 'Sente como costuma trabalhar, olhe para a tela e mantenha-se parado durante a contagem.'}
+          : phase === 'consent'
+            ? 'Sente-se ereto, olhe para a tela e mantenha-se parado. Vamos detectar os pontos do seu corpo por alguns segundos para personalizar o monitoramento.'
+            : 'Mantenha postura ereta, olhe para a tela e fique parado durante a contagem.'}
       </p>
 
       <div className="calibration-step__actions">
+        {phase === 'consent' ? (
+          <button className="button button--filled" type="button" onClick={beginCalibration}>
+            <ShieldCheck size={18} aria-hidden="true" />
+            Permitir câmera e começar
+          </button>
+        ) : null}
         {phase === 'error' && errorCopy.retryable ? (
           <button className="button button--filled" type="button" onClick={retry}>
             Tentar novamente

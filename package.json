@@ -8,8 +8,12 @@
     "dev": "electron-vite dev",
     "build": "npm run copy:mediapipe && npm run typecheck && electron-vite build",
     "dist": "npm run build && electron-builder",
-    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "predist:linux": "rm -rf release/linux-unpacked",
+    "dist:linux": "npm run build && electron-builder --linux AppImage",
+    "predist:linux:deb": "rm -rf release/linux-unpacked",
+    "dist:linux:deb": "npm run build && electron-builder --linux AppImage deb",
     "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -45,12 +49,7 @@
         "to": "mediapipe"
       }
     ],
-    "publish": [
-      {
-        "provider": "github",
-        "releaseType": "release"
-      }
-    ],
+    "publish": null,
     "linux": {
       "target": [
         "AppImage",
@@ -74,6 +73,34 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
+    },
+    "mac": {
+      "category": "public.app-category.healthcare-fitness",
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "identity": null,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSCameraUsageDescription": "O Postura Trabalho usa sua câmera localmente para analisar sua postura. Nenhuma imagem é enviada para servidores.",
+        "NSMicrophoneUsageDescription": "O Postura Trabalho não captura áudio; permissão solicitada apenas pelo runtime do navegador interno."
+      }
+    },
+    "dmg": {
+      "title": "Postura Trabalho ${version}",
+      "icon": "build/icon.png",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
     }
   },
   "dependencies": {

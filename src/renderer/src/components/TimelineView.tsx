@@ -1,4 +1,5 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Clock, Trash2, X } from 'lucide-react';
 
 import { clearTimeline, hydrateTimeline, loadTimeline } from '../lib/timeline/storage';
 import type { TimelineSegment, TimelineState } from '../lib/timeline/types';
@@ -116,19 +117,8 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
   );
 
   const totals = useMemo(() => sumTotals(clipped), [clipped]);
-  const rangeDuration = RANGE_DURATION_MS[range];
-
-  const bars = useMemo(
-    () =>
-      clipped.map((segment) => ({
-        state: segment.state,
-        left: ((segment.startedAt - rangeStart) / rangeDuration) * 100,
-        width: (segment.durationMs / rangeDuration) * 100,
-        startedAt: segment.startedAt,
-        endedAt: segment.endedAt,
-      })),
-    [clipped, rangeDuration, rangeStart],
-  );
+  const hasData = totals.monitored > 0;
+  const pct = (value: number): number => (hasData ? value / totals.monitored : 0);
 
   const handleClear = (): void => {
     clearTimeline();
@@ -138,9 +128,20 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
   return (
     <section className="card timeline-card" aria-label="Histórico de postura">
       <header className="timeline-card__header">
-        <h2 className="timeline-card__title">Histórico de postura</h2>
-        <button className="button button--text" type="button" onClick={onClose}>
-          Fechar
+        <div>
+          <h2 className="timeline-card__title">Histórico de postura</h2>
+          <p className="timeline-card__subtitle">
+            <Clock size={13} aria-hidden="true" />
+            <span>Tempo monitorado: {formatDuration(totals.monitored)}</span>
+          </p>
+        </div>
+        <button
+          className="icon-button"
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar histórico"
+        >
+          <X size={20} aria-hidden="true" />
         </button>
       </header>
 
@@ -162,105 +163,88 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
         })}
       </div>
 
-      <div className="timeline-bar" role="img" aria-label="Linha do tempo da postura">
-        {bars.length === 0 ? (
-          <div className="timeline-bar__empty">Sem dados nesta janela.</div>
-        ) : (
-          bars.map((bar) => (
-            <div
-              key={`${bar.startedAt}-${bar.endedAt}`}
-              className={`timeline-bar__segment timeline-bar__segment--${bar.state}`}
-              style={{ left: `${bar.left}%`, width: `${Math.max(0.2, bar.width)}%` }}
-              title={`${STATE_LABEL[bar.state]} · ${formatDuration(bar.endedAt - bar.startedAt)}`}
-            />
-          ))
-        )}
-      </div>
+      {hasData ? (
+        <div className="timeline-summary">
+          <div className="donut-chart" aria-hidden="true">
+            <svg viewBox="0 0 120 120" className="donut-chart__svg">
+              {(() => {
+                const r = 50;
+                const cx = 60;
+                const cy = 60;
+                const circumference = 2 * Math.PI * r;
+                const slices: { state: TimelineState; pct: number }[] = (
+                  ['good', 'warning', 'bad'] as const
+                )
+                  .filter((s) => totals[s] > 0)
+                  .map((s) => ({ state: s, pct: totals[s] / totals.monitored }));
 
-      <div className="donut-chart" aria-hidden="true">
-        <svg viewBox="0 0 120 120" className="donut-chart__svg">
-          {totals.monitored > 0 ? (
-            (() => {
-              const r = 50;
-              const cx = 60;
-              const cy = 60;
-              const circumference = 2 * Math.PI * r;
-              const slices: { state: TimelineState; pct: number }[] = (
-                ['good', 'warning', 'bad'] as const
-              )
-                .filter((s) => totals[s] > 0)
-                .map((s) => ({ state: s, pct: totals[s] / totals.monitored }));
+                let offset = 0;
+                return slices.map(({ state, pct: slicePct }) => {
+                  const dashArray = `${slicePct * circumference} ${circumference}`;
+                  const dashOffset = -offset * circumference;
+                  offset += slicePct;
+                  return (
+                    <circle
+                      key={state}
+                      className={`donut-chart__slice donut-chart__slice--${state}`}
+                      cx={cx}
+                      cy={cy}
+                      r={r}
+                      fill="none"
+                      strokeWidth="14"
+                      strokeDasharray={dashArray}
+                      strokeDashoffset={dashOffset}
+                      strokeLinecap="butt"
+                      transform="rotate(-90 60 60)"
+                    />
+                  );
+                });
+              })()}
+            </svg>
+            <div className="donut-chart__center">
+              <span className="donut-chart__value">{formatPercent(pct(totals.good))}</span>
+              <span className="donut-chart__caption">Postura ok</span>
+            </div>
+          </div>
 
-              let offset = 0;
-              return slices.map(({ state, pct }) => {
-                const dashArray = `${pct * circumference} ${circumference}`;
-                const dashOffset = -offset * circumference;
-                offset += pct;
-                return (
-                  <circle
-                    key={state}
-                    className={`donut-chart__slice donut-chart__slice--${state}`}
-                    cx={cx}
-                    cy={cy}
-                    r={r}
-                    fill="none"
-                    strokeWidth="14"
-                    strokeDasharray={dashArray}
-                    strokeDashoffset={dashOffset}
-                    strokeLinecap="butt"
-                    transform="rotate(-90 60 60)"
+          <ul className="timeline-stats">
+            {(['good', 'warning', 'bad'] as const).map((state) => (
+              <li key={state} className="timeline-stats__item">
+                <div className="timeline-stats__row">
+                  <span
+                    className={`timeline-stats__dot timeline-stats__dot--${state}`}
+                    aria-hidden="true"
                   />
-                );
-              });
-            })()
-          ) : (
-            <circle cx="60" cy="60" r="50" fill="none" strokeWidth="14" className="donut-chart__empty" />
-          )}
-        </svg>
-        {totals.monitored > 0 && (
-          <span className="donut-chart__center">
-            {formatPercent(totals.good / totals.monitored)}
-          </span>
-        )}
-      </div>
-
-      <ul className="timeline-stats">
-        <li className="timeline-stats__item">
-          <span className="timeline-stats__dot timeline-stats__dot--good" aria-hidden="true" />
-          <span className="timeline-stats__label">Postura ok</span>
-          <span className="timeline-stats__value">{formatDuration(totals.good)}</span>
-          <span className="timeline-stats__hint">
-            {totals.monitored > 0 ? formatPercent(totals.good / totals.monitored) : '—'}
-          </span>
-        </li>
-        <li className="timeline-stats__item">
-          <span className="timeline-stats__dot timeline-stats__dot--warning" aria-hidden="true" />
-          <span className="timeline-stats__label">Ajuste leve</span>
-          <span className="timeline-stats__value">{formatDuration(totals.warning)}</span>
-          <span className="timeline-stats__hint">
-            {totals.monitored > 0 ? formatPercent(totals.warning / totals.monitored) : '—'}
-          </span>
-        </li>
-        <li className="timeline-stats__item">
-          <span className="timeline-stats__dot timeline-stats__dot--bad" aria-hidden="true" />
-          <span className="timeline-stats__label">Postura ruim</span>
-          <span className="timeline-stats__value">{formatDuration(totals.bad)}</span>
-          <span className="timeline-stats__hint">
-            {totals.monitored > 0 ? formatPercent(totals.bad / totals.monitored) : '—'}
-          </span>
-        </li>
-      </ul>
+                  <span className="timeline-stats__label">{STATE_LABEL[state]}</span>
+                  <span className="timeline-stats__value">{formatDuration(totals[state])}</span>
+                  <span className="timeline-stats__hint">{formatPercent(pct(totals[state]))}</span>
+                </div>
+                <div className="timeline-stats__track" aria-hidden="true">
+                  <span
+                    className={`timeline-stats__fill timeline-stats__fill--${state}`}
+                    style={{ width: `${pct(totals[state]) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="timeline-empty" role="status">
+          <Clock size={20} aria-hidden="true" />
+          <p>Sem dados nesta janela.</p>
+          <span>Ative o monitoramento para começar a registrar.</span>
+        </div>
+      )}
 
       <div className="timeline-card__footer">
-        <span className="timeline-card__hint">
-          Tempo monitorado: {formatDuration(totals.monitored)}
-        </span>
         <button
           className="button button--text"
           type="button"
           onClick={handleClear}
           disabled={segments.length === 0}
         >
+          <Trash2 size={16} aria-hidden="true" />
           Limpar histórico
         </button>
       </div>

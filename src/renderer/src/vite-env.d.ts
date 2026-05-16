@@ -10,8 +10,19 @@ interface PostureStorageBridge {
 interface Window {
   postureApp?: {
     platform: NodeJS.Platform;
+    versions?: {
+      electron: string;
+      chrome: string;
+    };
     showAlert: (level: 'warning' | 'bad', message: string) => void;
     hideAlert: () => void;
+    enterMini?: () => void;
+    exitMini?: () => void;
+    window?: {
+      minimize: () => void;
+      toggleMaximize: () => void;
+      close: () => void;
+    };
     storage?: PostureStorageBridge;
   };
 }

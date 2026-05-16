@@ -118,7 +118,7 @@ export const Onboarding = ({
 const WelcomeStep = (): ReactElement => (
   <div className="onboarding-m__step">
     <div className="onboarding-m__hero" aria-hidden="true">
-      <img className="onboarding-m__hero-logo" src="/app-logo.png" alt="" />
+      <img className="onboarding-m__hero-logo" src="./app-logo.png" alt="" />
     </div>
     <h2 className="onboarding-m__title">Postura sob controle</h2>
     <p className="onboarding-m__copy">
@@ -187,8 +187,8 @@ const CalibrateStep = ({
   <div className="onboarding-m__step">
     <h2 className="onboarding-m__title">Calibragem inicial</h2>
     <p className="onboarding-m__copy">
-      Vamos medir sua postura natural por {durationSeconds}s para personalizar a detecção. Os dados
-      ficam só neste dispositivo.
+      Vamos medir sua postura ereta por {durationSeconds}s para personalizar a detecção.
+      Sente-se reto e olhe para a tela — os dados ficam só neste dispositivo.
     </p>
     <CalibrationStep
       durationSeconds={durationSeconds}

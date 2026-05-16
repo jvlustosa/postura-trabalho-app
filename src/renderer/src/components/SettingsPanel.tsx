@@ -1,4 +1,5 @@
-import { type ReactElement } from 'react';
+import { type ComponentType, type ReactElement, type SVGProps } from 'react';
+import { Bell, Camera, Crosshair, Settings2, SlidersHorizontal } from 'lucide-react';
 
 import { ScreenHeightPicker } from './ScreenHeightPicker';
 import type { AlertThresholdSeconds, AppSettings, SensitivityLevel } from '../lib/settings/types';
@@ -18,7 +19,7 @@ const sensitivityLabels: Record<SensitivityLevel, string> = {
 
 const calibrationOptions: AppSettings['calibrationSeconds'][] = [3, 5, 8];
 
-const alertThresholdOptions: AlertThresholdSeconds[] = [30, 60, 120, 300];
+const alertThresholdOptions: AlertThresholdSeconds[] = [30, 60, 120, 180];
 
 const formatAlertThreshold = (seconds: AlertThresholdSeconds): string =>
   seconds >= 60 ? `${seconds / 60} min` : `${seconds}s`;
@@ -37,6 +38,19 @@ export const SettingsPanel = ({
           Fechar
         </button>
       </header>
+
+      <div className="settings-group" role="group" aria-label="Altura da tela">
+        <div className="settings-group__head">
+          <span className="settings-group__label">Altura da tela</span>
+          <span className="settings-group__hint">
+            Posição do seu monitor em relação aos olhos.
+          </span>
+        </div>
+        <ScreenHeightPicker
+          value={settings.screenHeight}
+          onChange={(next) => onChange({ screenHeight: next })}
+        />
+      </div>
 
       <div className="settings-group" role="group" aria-label="Sensibilidade">
         <div className="settings-group__head">
@@ -92,19 +106,6 @@ export const SettingsPanel = ({
         </div>
       </div>
 
-      <div className="settings-group" role="group" aria-label="Altura da tela">
-        <div className="settings-group__head">
-          <span className="settings-group__label">Altura da tela</span>
-          <span className="settings-group__hint">
-            Posição do seu monitor em relação aos olhos.
-          </span>
-        </div>
-        <ScreenHeightPicker
-          value={settings.screenHeight}
-          onChange={(next) => onChange({ screenHeight: next })}
-        />
-      </div>
-
       <ToggleRow
         label="Espelhar vídeo"
         hint="Mostra a imagem invertida como se fosse um espelho."
@@ -124,6 +125,13 @@ export const SettingsPanel = ({
         hint="Mostra um aviso por cima de qualquer janela quando a postura ruim persiste."
         value={settings.alertsEnabled}
         onChange={(value) => onChange({ alertsEnabled: value })}
+      />
+
+      <ToggleRow
+        label="Iniciar automaticamente"
+        hint="Ativa a análise de postura assim que o app abrir."
+        value={settings.autoStart}
+        onChange={(value) => onChange({ autoStart: value })}
       />
 
       <div className="settings-group" role="group" aria-label="Tempo até o alerta">

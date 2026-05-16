@@ -1,8 +1,11 @@
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { Camera, Crosshair, Flame, Minimize2, Maximize2, RotateCcw, Sparkles } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
+import type { MiniView } from '../App';
 import { type AlertLevel, createPostureWatcher } from '../lib/alerts/createPostureWatcher';
+import { buildCameraDiagnosticReport } from '../lib/media/buildCameraDiagnosticReport';
+import { classifyMediaError, formatMediaErrorDetails } from '../lib/media/classifyMediaError';
 import { createPoseLandmarker } from '../lib/pose/createPoseLandmarker';
 import { mapPoseLandmarks } from '../lib/pose/mapPoseLandmarks';
 import { drawPoseOverlay } from '../lib/pose/poseOverlay';
@@ -19,6 +22,9 @@ interface PostureCheckProps {
   onStop: () => void;
   settings: AppSettings;
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
+  miniView?: MiniView;
+  onChangeMiniView?: (next: MiniView) => void;
+  onExitMini?: () => void;
 }
 
 const UPRIGHT_SAMPLE_LIMITS = {
@@ -26,6 +32,11 @@ const UPRIGHT_SAMPLE_LIMITS = {
   shoulderTilt: 0.06,
 };
 const MIN_CALIBRATION_SAMPLES = 5;
+
+const POSTURE_CHECK_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
+  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 60 } },
+  audio: false,
+};
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
@@ -96,13 +107,55 @@ const buildAlertMessage = (level: AlertLevel, reasons: PostureReason[]): string 
   return reasonMessages[relevant[0]]?.[level] ?? 'Reajuste sua postura.';
 };
 
-export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureCheckProps): ReactElement => {
+const SCORE_HISTORY_MAX = 60;
+const SCORE_SAMPLE_INTERVAL_MS = 1000;
+
+const formatStreak = (ms: number): string => {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+const buildSparklinePoints = (values: readonly number[], width: number, height: number): string => {
+  if (values.length < 2) return '';
+  const step = width / (values.length - 1);
+  return values
+    .map((v, i) => {
+      const clamped = Math.max(0, Math.min(100, v));
+      const x = i * step;
+      const y = height - (clamped / 100) * height;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+};
+
+export const PostureCheck = ({
+  onStop,
+  settings,
+  onSettingsChange,
+  miniView = 'off',
+  onChangeMiniView,
+  onExitMini,
+}: PostureCheckProps): ReactElement => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraStageRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const frameRef = useRef<number | null>(null);
   const lastInferenceRef = useRef(0);
+  const miniViewRef = useRef<MiniView>(miniView);
+
+  useEffect(() => {
+    miniViewRef.current = miniView;
+    const stage = cameraStageRef.current;
+    if (stage && miniView !== 'face') {
+      stage.style.setProperty('--face-x', '50%');
+      stage.style.setProperty('--face-y', '50%');
+    }
+  }, [miniView]);
   const calibrationStartedRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<PostureAnalysis['metrics'][]>([]);
   const baseThresholdsRef = useRef<PostureThresholds | null>(null);
@@ -134,9 +187,38 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
     [],
   );
 
+  const streakStartRef = useRef<number | null>(null);
+  const scoreHistoryRef = useRef<number[]>([]);
+  const lastScoreSampleRef = useRef(0);
+
   const [analysis, setAnalysis] = useState<PostureAnalysis>(initialAnalysis);
   const [awaitingUpright, setAwaitingUpright] = useState(false);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [copyDiagFeedback, setCopyDiagFeedback] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [streakMs, setStreakMs] = useState(0);
+  const [scoreHistory, setScoreHistory] = useState<number[]>([]);
+  const diagnosticCaptureRef = useRef<{ error?: unknown; stream?: MediaStream | null }>({});
+
+  const copyDetailedLogs = useCallback(async (): Promise<void> => {
+    const { error, stream } = diagnosticCaptureRef.current;
+    try {
+      const text = await buildCameraDiagnosticReport(error, {
+        surface: 'posture-check',
+        uiMessage: analysis.message,
+        analysisState: analysis.state,
+        constraints: POSTURE_CHECK_MEDIA_CONSTRAINTS,
+        video: videoRef.current,
+        stream: stream ?? streamRef.current,
+      });
+      await navigator.clipboard.writeText(text);
+      setCopyDiagFeedback('copied');
+      window.setTimeout(() => setCopyDiagFeedback('idle'), 2500);
+    } catch {
+      setCopyDiagFeedback('failed');
+      window.setTimeout(() => setCopyDiagFeedback('idle'), 2500);
+    }
+  }, [analysis.message, analysis.state]);
 
   // Sync settings changes into refs
   useEffect(() => {
@@ -212,6 +294,9 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
     baseThresholdsRef.current = null;
     personalizedThresholdsRef.current = null;
     isCalibratedRef.current = false;
+    streakStartRef.current = null;
+    scoreHistoryRef.current = [];
+    lastScoreSampleRef.current = 0;
     smoother.reset();
     landmarkSmoother.reset();
     postureWatcher.reset();
@@ -220,6 +305,8 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
     window.postureApp?.hideAlert();
     setAwaitingUpright(false);
     setCalibrationProgress(0);
+    setStreakMs(0);
+    setScoreHistory([]);
     setAnalysis({ ...initialAnalysis, message: 'Recalibrando' });
   }, [smoother, landmarkSmoother, postureWatcher, timelineRecorder]);
 
@@ -247,6 +334,26 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
       const poseLandmarks = result.landmarks[0];
       const overlay = overlayRef.current;
       const landmarks = landmarkSmoother.smooth(mapPoseLandmarks(poseLandmarks));
+
+      if (miniViewRef.current === 'face' && poseLandmarks && poseLandmarks.length > 0) {
+        const nose = poseLandmarks[0];
+        const leftEar = poseLandmarks[7];
+        const rightEar = poseLandmarks[8];
+        const fxRaw =
+          (nose?.x ?? 0.5) * 0.6 +
+          ((leftEar?.x ?? nose?.x ?? 0.5) + (rightEar?.x ?? nose?.x ?? 0.5)) * 0.2;
+        const fyRaw =
+          (nose?.y ?? 0.5) * 0.6 +
+          ((leftEar?.y ?? nose?.y ?? 0.5) + (rightEar?.y ?? nose?.y ?? 0.5)) * 0.2;
+        const stage = cameraStageRef.current;
+        if (stage) {
+          const displayedFx = settings.mirrorVideo ? 1 - fxRaw : fxRaw;
+          const clampedX = Math.max(0.15, Math.min(0.85, displayedFx));
+          const clampedY = Math.max(0.15, Math.min(0.85, fyRaw));
+          stage.style.setProperty('--face-x', `${(clampedX * 100).toFixed(1)}%`);
+          stage.style.setProperty('--face-y', `${(clampedY * 100).toFixed(1)}%`);
+        }
+      }
 
       if (overlay && showOverlayRef.current) {
         const bounds = overlay.getBoundingClientRect();
@@ -327,37 +434,96 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
       postureWatcher.observe(nextAnalysis.state, nextAnalysis.reasons);
       timelineRecorder.observe(nextAnalysis.state);
       setAnalysis(nextAnalysis);
+
+      if (nextAnalysis.state === 'good') {
+        if (streakStartRef.current === null) {
+          streakStartRef.current = now;
+        }
+        setStreakMs(now - streakStartRef.current);
+      } else if (streakStartRef.current !== null) {
+        streakStartRef.current = null;
+        setStreakMs(0);
+      }
+
+      if (now - lastScoreSampleRef.current >= SCORE_SAMPLE_INTERVAL_MS) {
+        lastScoreSampleRef.current = now;
+        const history = scoreHistoryRef.current;
+        history.push(nextAnalysis.score);
+        if (history.length > SCORE_HISTORY_MAX) history.shift();
+        setScoreHistory([...history]);
+      }
+    };
+
+    const messageForCameraError = (error: unknown): string => {
+      switch (classifyMediaError(error)) {
+        case 'permission-denied':
+          return 'Permissão da webcam negada. Libere o acesso à câmera nas configurações do sistema.';
+        case 'no-camera':
+          return 'Nenhuma webcam encontrada. Conecte uma câmera e tente novamente.';
+        case 'camera-in-use':
+          return 'Webcam em uso por outro app. Feche videoconferências ou apps que estejam usando a câmera.';
+        case 'unsupported':
+          return 'Webcam indisponível neste dispositivo.';
+        default:
+          return 'Sem acesso à webcam. Verifique a permissão.';
+      }
     };
 
     const start = async (): Promise<void> => {
+      diagnosticCaptureRef.current = {};
+      let stream: MediaStream;
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 60 } },
-          audio: false,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+        stream = await navigator.mediaDevices.getUserMedia(POSTURE_CHECK_MEDIA_CONSTRAINTS);
+      } catch (error) {
+        console.warn('[posture-check] camera error', error);
+        if (!cancelled) {
+          diagnosticCaptureRef.current = { error, stream: null };
+          setErrorDetails(formatMediaErrorDetails(error));
+          setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
         }
+        return;
+      }
 
-        streamRef.current = stream;
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
 
+      streamRef.current = stream;
+
+      try {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
+      } catch (error) {
+        console.warn('[posture-check] video play error', error);
+        if (!cancelled) {
+          diagnosticCaptureRef.current = { error, stream: streamRef.current };
+          setErrorDetails(formatMediaErrorDetails(error));
+          setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
+        }
+        return;
+      }
 
+      try {
         landmarkerRef.current = await createPoseLandmarker();
+      } catch (error) {
+        console.warn('[posture-check] pose landmarker error', error);
+        if (!cancelled) {
+          diagnosticCaptureRef.current = { error, stream: streamRef.current };
+          setErrorDetails(formatMediaErrorDetails(error));
+          setAnalysis({ ...initialAnalysis, state: 'model-error', message: 'Falha ao carregar o detector de pose.' });
+        }
+        return;
+      }
 
-        if (!cancelled) {
-          setAnalysis((c) => ({ ...c, message: 'Calibrando' }));
-          frameRef.current = requestAnimationFrame(runFrame);
-        }
-      } catch {
-        if (!cancelled) {
-          setAnalysis({ ...initialAnalysis, state: 'camera-error', message: 'Sem acesso à webcam. Verifique a permissão.' });
-        }
+      if (!cancelled) {
+        diagnosticCaptureRef.current = {};
+        setErrorDetails(null);
+        setAnalysis((c) => ({ ...c, message: 'Calibrando' }));
+        frameRef.current = requestAnimationFrame(runFrame);
       }
     };
 
@@ -380,6 +546,9 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
       baseThresholdsRef.current = null;
       personalizedThresholdsRef.current = null;
       isCalibratedRef.current = false;
+      streakStartRef.current = null;
+      scoreHistoryRef.current = [];
+      lastScoreSampleRef.current = 0;
     };
   }, [smoother, landmarkSmoother, postureWatcher, timelineRecorder, persistCalibration]);
 
@@ -409,6 +578,102 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
       ]
     : [];
 
+  const isMini = miniView !== 'off';
+  const miniViewClass = isMini ? ` camera-stage--mini camera-stage--mini-${miniView}` : '';
+  const showVideoInMini = miniView !== 'points';
+  const showOverlayInMini = !isMini || miniView === 'points' || settings.showOverlay;
+
+  if (isMini) {
+    return (
+      <section
+        className={`mini-panel mini-panel--${miniView} status-${analysis.state}`}
+        aria-live="polite"
+      >
+        <div
+          ref={cameraStageRef}
+          className={`camera-stage${settings.mirrorVideo && miniView !== 'face' ? ' camera-stage--mirrored' : ''}${miniViewClass}`}
+        >
+          <div className="camera-stage__inner">
+            <video
+              ref={videoRef}
+              className={`camera-preview${showVideoInMini ? '' : ' camera-preview--hidden'}`}
+              muted
+              playsInline
+            />
+            <canvas
+              ref={overlayRef}
+              className={`pose-overlay${showOverlayInMini ? '' : ' pose-overlay--hidden'}`}
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="mini-drag-region" aria-hidden="true" />
+
+          <div className="mini-controls" role="toolbar" aria-label="Controles do mini">
+            <span
+              className={`mini-controls__status status-dot status-${analysis.state}`}
+              aria-label={statusLabels[analysis.state]}
+            />
+            <div className="mini-controls__modes" role="group" aria-label="Modo de visualização">
+              <button
+                type="button"
+                className={`mini-mode-btn${miniView === 'full' ? ' mini-mode-btn--active' : ''}`}
+                aria-pressed={miniView === 'full'}
+                aria-label="Câmera completa"
+                title="Câmera completa"
+                onClick={() => onChangeMiniView?.('full')}
+              >
+                <Camera size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={`mini-mode-btn${miniView === 'face' ? ' mini-mode-btn--active' : ''}`}
+                aria-pressed={miniView === 'face'}
+                aria-label="Seguir rosto"
+                title="Seguir rosto"
+                onClick={() => onChangeMiniView?.('face')}
+              >
+                <Crosshair size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={`mini-mode-btn${miniView === 'points' ? ' mini-mode-btn--active' : ''}`}
+                aria-pressed={miniView === 'points'}
+                aria-label="Apenas pontos"
+                title="Apenas pontos"
+                onClick={() => onChangeMiniView?.('points')}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+              </button>
+            </div>
+            <button
+              type="button"
+              className="mini-mode-btn mini-mode-btn--expand"
+              aria-label="Expandir janela"
+              title="Expandir janela"
+              onClick={() => onExitMini?.()}
+            >
+              <Maximize2 size={14} aria-hidden="true" />
+            </button>
+          </div>
+
+          {analysis.state === 'good' && streakMs >= 1000 ? (
+            <div className="mini-streak" aria-label={`Streak ${formatStreak(streakMs)}`}>
+              <Flame size={11} aria-hidden="true" />
+              <span>{formatStreak(streakMs)}</span>
+            </div>
+          ) : null}
+
+          {isError ? (
+            <p className="mini-error" role="alert">
+              {analysis.message}
+            </p>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="card posture-card" aria-live="polite">
       <div className="posture-header">
@@ -426,13 +691,25 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
           >
             <RotateCcw size={20} aria-hidden="true" />
           </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Abrir em janela flutuante"
+            title="Modo flutuante"
+            onClick={() => onChangeMiniView?.('full')}
+          >
+            <Minimize2 size={20} aria-hidden="true" />
+          </button>
           <button className="button button--text" type="button" onClick={onStop}>
             Pausar
           </button>
         </div>
       </div>
 
-      <div className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}`}>
+      <div
+        ref={cameraStageRef}
+        className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}`}
+      >
         <video ref={videoRef} className="camera-preview" muted playsInline />
         <canvas
           ref={overlayRef}
@@ -456,9 +733,85 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
             <div className="calibration-progress__fill" style={{ width: `${calibrationPercent}%` }} />
           </div>
         ) : null}
+        {isActive && analysis.state === 'good' && streakMs >= 1000 ? (
+          <div className="streak-pill" aria-live="polite" aria-label={`Streak de postura ${formatStreak(streakMs)}`}>
+            <Flame size={14} aria-hidden="true" />
+            <span className="streak-pill__time">{formatStreak(streakMs)}</span>
+          </div>
+        ) : null}
+        {isActive && scoreHistory.length >= 2 ? (
+          <div
+            className={`sparkline sparkline--${analysis.state}`}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 100 24" preserveAspectRatio="none">
+              <polyline
+                points={buildSparklinePoints(scoreHistory, 100, 24)}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+        ) : null}
+        {checklistItems.length > 0 ? (
+          <aside className="evaluation evaluation--floating" aria-label="Avaliação da postura">
+            <div className="evaluation__score">
+              <span className="evaluation__score-label">Score geral</span>
+              <span className="evaluation__score-value">{analysis.score}</span>
+            </div>
+            <ul className="checklist" role="list">
+              {checklistItems.map((item) => (
+                <li key={item.label} className={`checklist__item checklist__item--${item.ok ? 'ok' : 'bad'}`}>
+                  <span className="checklist__label">{item.label}</span>
+                  <span className="checklist__mark" aria-label={item.ok ? 'Ok' : 'Corrigir'}>
+                    {item.ok ? '✓' : '✗'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        ) : null}
       </div>
 
-      {isError ? <p className="error-note">{analysis.message}</p> : null}
+      {isError ? (
+        <div className="error-note" role="alert">
+          <p className="error-note__message">{analysis.message}</p>
+          <div className="error-note__actions">
+            <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
+              Copiar logs detalhados
+            </button>
+            {copyDiagFeedback === 'copied' ? (
+              <span className="error-note__feedback" aria-live="polite">
+                Copiado para a área de transferência
+              </span>
+            ) : null}
+            {copyDiagFeedback === 'failed' ? (
+              <span className="error-note__feedback" aria-live="polite">
+                Não foi possível copiar — selecione e copie os detalhes abaixo
+              </span>
+            ) : null}
+          </div>
+          {errorDetails ? (
+            <details className="error-note__details">
+              <summary>Resumo do erro (copiar)</summary>
+              <pre className="error-note__pre">{errorDetails}</pre>
+              <button
+                type="button"
+                className="button button--text"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(errorDetails).catch(() => undefined);
+                }}
+              >
+                Copiar resumo
+              </button>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
 
       {isActive ? (
         <div className={`status-row${analysis.state === 'bad' ? ' status-row--error' : ''}`}>
@@ -480,25 +833,6 @@ export const PostureCheck = ({ onStop, settings, onSettingsChange }: PostureChec
             className={`score-bar__fill${scoreBarModifier}`}
             style={{ width: `${analysis.score}%` }}
           />
-        </div>
-      ) : null}
-
-      {checklistItems.length > 0 ? (
-        <div className="evaluation">
-          <ul className="checklist" role="list">
-            {checklistItems.map((item) => (
-              <li key={item.label} className={`checklist__item checklist__item--${item.ok ? 'ok' : 'bad'}`}>
-                <span className="checklist__label">{item.label}</span>
-                <span className="checklist__mark" aria-label={item.ok ? 'Ok' : 'Corrigir'}>
-                  {item.ok ? '✓' : '✗'}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="evaluation__score">
-            <span className="evaluation__score-label">Score geral</span>
-            <span className="evaluation__score-value">{analysis.score}</span>
-          </div>
         </div>
       ) : null}
     </section>

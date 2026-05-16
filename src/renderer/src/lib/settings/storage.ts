@@ -11,7 +11,7 @@ const STORAGE_KEY = 'postura-trabalho.settings.v1';
 
 const sensitivityValues: readonly SensitivityLevel[] = ['relaxed', 'standard', 'strict'];
 const calibrationValues: readonly AppSettings['calibrationSeconds'][] = [3, 5, 8];
-const alertThresholdValues: readonly AlertThresholdSeconds[] = [30, 60, 120, 300];
+const alertThresholdValues: readonly AlertThresholdSeconds[] = [30, 60, 120, 180];
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
@@ -129,6 +129,8 @@ const parseSettings = (raw: unknown): AppSettings => {
       typeof c.floatingWindow === 'boolean' ? c.floatingWindow : defaultSettings.floatingWindow,
     compactMode:
       typeof c.compactMode === 'boolean' ? c.compactMode : defaultSettings.compactMode,
+    autoStart:
+      typeof c.autoStart === 'boolean' ? c.autoStart : defaultSettings.autoStart,
   };
 };
 
