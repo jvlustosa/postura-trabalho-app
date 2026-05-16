@@ -1,0 +1,104 @@
+{
+  "name": "postura-trabalho",
+  "version": "1.0.0",
+  "description": "Desktop posture checker with local webcam pose detection.",
+  "homepage": "https://example.com/postura-trabalho",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run copy:mediapipe && npm run typecheck && electron-vite build",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "copy:mediapipe": "node scripts/copy-mediapipe-assets.mjs"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Postura Trabalho",
+    "email": "postura-trabalho@example.com"
+  },
+  "license": "ISC",
+  "type": "module",
+  "build": {
+    "appId": "com.local.posturatrabalho",
+    "productName": "Postura Trabalho",
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "public/models",
+        "to": "models"
+      },
+      {
+        "from": "public/mediapipe",
+        "to": "mediapipe"
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "electron-updater": "^6.8.3",
+    "lucide-react": "^1.16.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0",
+    "eslint": "^10.4.0",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.3",
+    "vite": "^7.3.3",
+    "vitest": "^4.1.6"
+  }
+}
