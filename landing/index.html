@@ -7,38 +7,37 @@
     <meta name="theme-color" content="#0e1514" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
-      content="Postura Trabalho. App de desktop que olha sua postura no home office. Licença vitalícia por R$ 99."
+      content="Postura Trabalho. App de desktop que olha sua postura no home office. Licença vitalícia por R$ 149."
     />
     <meta property="og:site_name" content="Postura Trabalho" />
     <meta property="og:title" content="Postura Trabalho. Postura no eixo, sem você notar." />
     <meta
       property="og:description"
-      content="App de desktop que olha sua postura no home office pela webcam, 100% local. Vitalício por R$ 99."
+      content="App de desktop que olha sua postura no home office pela webcam, 100% local. Vitalício por R$ 149."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://postura-trabalho.vercel.app/" />
     <meta property="og:locale" content="pt_BR" />
     <meta
       property="og:image"
-      content="https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630&fit=crop"
+      content="https://postura-trabalho.vercel.app/assets/hero-postura-guia.jpg"
     />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="660" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Postura Trabalho. Postura no eixo, sem você notar." />
     <meta
       name="twitter:description"
-      content="App de desktop que olha sua postura no home office. 100% local. R$ 99 vitalício."
+      content="App de desktop que olha sua postura no home office. 100% local. R$ 149 vitalício."
     />
     <meta
       name="twitter:image"
-      content="https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630&fit=crop"
+      content="https://postura-trabalho.vercel.app/assets/hero-postura-guia.jpg"
     />
     <link rel="icon" type="image/png" href="./assets/logo.png" />
     <link rel="apple-touch-icon" href="./assets/icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://images.pexels.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
       rel="stylesheet"
@@ -52,10 +51,11 @@
       <header class="app-bar">
         <a class="app-bar__brand" href="#top" aria-label="Postura Trabalho">
           <img class="app-bar__logo" src="./assets/logo.png" alt="" />
-          <h1 class="app-bar__title">Postura Trabalho</h1>
+          <span class="app-bar__title">Postura Trabalho</span>
         </a>
         <div class="app-bar__actions">
           <a class="app-bar__link" href="#como-funciona">Como funciona</a>
+          <a class="app-bar__link" href="#duvidas">Dúvidas</a>
           <a class="app-bar__link" href="#preco">Preço</a>
           <a class="button button--filled app-bar__cta" href="#comprar">
             Comprar
@@ -70,10 +70,10 @@
               <i data-lucide="home" aria-hidden="true"></i>
               <span>Pra quem trabalha de casa</span>
             </span>
-            <h2 id="hero-title" class="hero__title">
+            <h1 id="hero-title" class="hero__title">
               Postura no eixo,<br />
               sem você notar.
-            </h2>
+            </h1>
             <p class="hero__lead">
               Um app de desktop que fica de olho na sua postura enquanto você trabalha.
               Roda na sua webcam, do seu jeito, sem mandar nada pra nuvem.
@@ -81,11 +81,11 @@
 
             <div class="hero__cta">
               <a class="button button--filled button--cta" href="#comprar">
-                <i data-lucide="sparkles" aria-hidden="true"></i>
-                <span>Quero pelo lifetime de R$ 99</span>
+                <i data-lucide="check" aria-hidden="true"></i>
+                <span>Quero pelo lifetime de R$ 149</span>
               </a>
               <p class="hero__hint">
-                Paga uma vez, usa pra sempre. Windows, Linux e macOS.
+                Paga uma vez, usa pra sempre. Windows e Linux hoje, macOS em breve.
               </p>
             </div>
 
@@ -96,35 +96,25 @@
               </li>
               <li class="feature-item">
                 <i data-lucide="zap" aria-hidden="true"></i>
-                <span>Levinho no PC</span>
+                <span>Leve no PC</span>
               </li>
               <li class="feature-item">
                 <i data-lucide="bell-off" aria-hidden="true"></i>
-                <span>Sem barulhinho</span>
+                <span>Sem barulho</span>
               </li>
             </ul>
           </div>
 
-          <div class="hero__visual" aria-hidden="true">
-            <figure class="hero__photo">
+          <div class="hero__visual">
+            <figure class="hero__photo hero__photo--guide">
               <img
-                src="https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=1400"
-                srcset="
-                  https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=800  800w,
-                  https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=1200 1200w,
-                  https://images.pexels.com/photos/5198249/pexels-photo-5198249.jpeg?auto=compress&cs=tinysrgb&w=1600 1600w
-                "
-                sizes="(max-width: 900px) 100vw, 50vw"
-                alt="Pessoa trabalhando em home office em um setup minimalista"
+                src="./assets/hero-postura-guia.jpg"
+                width="1024"
+                height="660"
+                alt="Ilustração comparando postura correta e incorreta na mesa: coluna alinhada, olhos na altura do monitor e pés apoiados, versus corpo curvado e olhar baixo."
                 loading="eager"
                 decoding="async"
               />
-              <div class="hero__photo-overlay">
-                <span class="hero__photo-chip">
-                  <span class="hero__photo-dot"></span>
-                  Postura boa
-                </span>
-              </div>
             </figure>
           </div>
         </section>
@@ -161,7 +151,7 @@
         <section class="section" id="como-funciona" aria-labelledby="howto-title">
           <header class="section__head">
             <span class="eyebrow eyebrow--plain">Como funciona</span>
-            <h3 id="howto-title" class="section__title">Três passos. Depois ele cuida sozinho.</h3>
+            <h3 id="howto-title" class="section__title">Três passos. Depois é automático.</h3>
           </header>
 
           <ol class="steps">
@@ -179,7 +169,7 @@
                 <i data-lucide="camera" aria-hidden="true"></i>
               </span>
               <div class="step__text">
-                <h4>Calibra rapidinho</h4>
+                <h4>Calibra rápido</h4>
                 <p>Senta confortável. Em segundos ele aprende a sua postura ideal.</p>
               </div>
             </li>
@@ -212,7 +202,7 @@
             </div>
             <div class="price-card__amount">
               <span class="price-card__currency">R$</span>
-              <span class="price-card__value">99</span>
+              <span class="price-card__value">149</span>
               <span class="price-card__period">lifetime</span>
             </div>
             <p class="price-card__lead">
@@ -243,8 +233,8 @@
             </ul>
 
             <a class="button button--filled button--cta price-card__cta" href="#" data-checkout>
-              <i data-lucide="sparkles" aria-hidden="true"></i>
-              <span>Comprar agora por R$ 99</span>
+              <i data-lucide="check" aria-hidden="true"></i>
+              <span>Comprar agora por R$ 149</span>
             </a>
 
             <p class="price-card__small">
@@ -253,40 +243,62 @@
           </div>
         </section>
 
-        <section class="section" aria-labelledby="faq-title">
-          <header class="section__head">
+        <section class="section section--faq" id="duvidas" aria-labelledby="faq-title">
+          <header class="section__head section__head--faq">
             <span class="eyebrow eyebrow--plain">Dúvidas</span>
             <h3 id="faq-title" class="section__title">Perguntas frequentes</h3>
+            <p class="section__subtitle section__subtitle--faq">
+              O essencial sobre licença, instalação, privacidade e garantia.
+            </p>
           </header>
 
-          <div class="faq">
+          <div class="faq faq-panel" role="group" aria-label="Perguntas frequentes">
             <details class="faq__item">
               <summary>
-                <span>É vitalício mesmo?</span>
-                <i data-lucide="chevron-down" aria-hidden="true"></i>
+                <span class="faq__q">É vitalício mesmo?</span>
+                <span class="faq__chev" aria-hidden="true">
+                  <i data-lucide="chevron-down"></i>
+                </span>
               </summary>
-              <p>É sim. Um pagamento único de R$ 99 e a licença é sua pra sempre, com as atualizações futuras inclusas.</p>
+              <div class="faq__body">
+                <p>
+                  É sim. Um pagamento único de R$ 149 e a licença é sua pra sempre, com as atualizações
+                  futuras inclusas.
+                </p>
+              </div>
             </details>
             <details class="faq__item">
               <summary>
-                <span>Dá pra instalar em mais de um computador?</span>
-                <i data-lucide="chevron-down" aria-hidden="true"></i>
+                <span class="faq__q">Dá pra instalar em mais de um computador?</span>
+                <span class="faq__chev" aria-hidden="true">
+                  <i data-lucide="chevron-down"></i>
+                </span>
               </summary>
-              <p>Dá. Até 3 computadores do mesmo usuário.</p>
+              <div class="faq__body">
+                <p>Dá. Até 3 computadores do mesmo usuário.</p>
+              </div>
             </details>
             <details class="faq__item">
               <summary>
-                <span>O app manda imagens pra algum servidor?</span>
-                <i data-lucide="chevron-down" aria-hidden="true"></i>
+                <span class="faq__q">O app manda imagens pra algum servidor?</span>
+                <span class="faq__chev" aria-hidden="true">
+                  <i data-lucide="chevron-down"></i>
+                </span>
               </summary>
-              <p>Não. Tudo roda local no seu PC. Nenhum frame da webcam sai da sua máquina.</p>
+              <div class="faq__body">
+                <p>Não. Tudo roda local no seu PC. Nenhum frame da webcam sai da sua máquina.</p>
+              </div>
             </details>
             <details class="faq__item">
               <summary>
-                <span>E se eu não gostar?</span>
-                <i data-lucide="chevron-down" aria-hidden="true"></i>
+                <span class="faq__q">E se eu não gostar?</span>
+                <span class="faq__chev" aria-hidden="true">
+                  <i data-lucide="chevron-down"></i>
+                </span>
               </summary>
-              <p>Garantia de 7 dias. Você pede e a gente devolve, sem fazer drama.</p>
+              <div class="faq__body">
+                <p>Garantia de 7 dias. Você pede e a gente devolve, sem fazer drama.</p>
+              </div>
             </details>
           </div>
         </section>

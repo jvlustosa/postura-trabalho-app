@@ -38,6 +38,7 @@ landing/
 ├── app.js           # OS detection + GitHub Releases API
 ├── vercel.json      # Headers e cache
 └── assets/
-    ├── logo.png     # Logo da topbar e favicon
-    └── icon.png     # OG image
+    ├── logo.png
+    ├── icon.png
+    └── hero-postura-guia.jpg   # ilustração hero (postura certa vs errada)
 ```
