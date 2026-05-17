@@ -40,6 +40,17 @@ const CALIBRATION_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
 };
 
+const SETTLE_DELAY_MS = 1_000;
+const UPRIGHT_SAMPLE_LIMITS = {
+  headOffset: 0.12,
+  shoulderTilt: 0.06,
+};
+const MIN_UPRIGHT_SAMPLES = 5;
+
+const isUprightSample = (metrics: PostureAnalysis['metrics']): boolean =>
+  metrics.headOffset <= UPRIGHT_SAMPLE_LIMITS.headOffset &&
+  metrics.shoulderTilt <= UPRIGHT_SAMPLE_LIMITS.shoulderTilt;
+
 interface ErrorCopy {
   title: string;
   hint: string;
@@ -180,13 +191,17 @@ export const CalibrationStep = ({
     };
 
     const finish = (): void => {
-      const samples = samplesRef.current;
+      const allSamples = samplesRef.current;
 
-      if (samples.length < 5) {
+      if (allSamples.length < 5) {
         failWith('no-samples');
 
         return;
       }
+
+      const uprightSamples = allSamples.filter(isUprightSample);
+      const samples =
+        uprightSamples.length >= MIN_UPRIGHT_SAMPLES ? uprightSamples : allSamples;
 
       const thresholds = createPersonalizedThresholds(samples);
       const baseline = samples.reduce(
@@ -255,11 +270,12 @@ export const CalibrationStep = ({
           });
         }
 
-        if (analysis.state !== 'calibrating') {
+        const elapsed = now - startedAt;
+
+        if (analysis.state !== 'calibrating' && elapsed >= SETTLE_DELAY_MS) {
           samplesRef.current.push(analysis.metrics);
         }
 
-        const elapsed = now - startedAt;
         const remaining = Math.max(0, Math.ceil((durationMs - elapsed) / 1_000));
         setSecondsLeft(remaining);
         setProgress(Math.min(1, elapsed / Math.max(1, durationMs)));

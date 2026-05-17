@@ -6,6 +6,7 @@ import {
   History,
   Minus,
   Pause,
+  PictureInPicture2,
   Play,
   Settings as SettingsIcon,
   Shield,
@@ -18,6 +19,8 @@ import { Onboarding } from './components/Onboarding';
 import { PostureCheck } from './components/PostureCheck';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimelineView } from './components/TimelineView';
+import { clearSession, loadSession, saveSession } from './lib/session/storage';
+import { isWithinSchedule } from './lib/settings/schedule';
 import { useSettings } from './lib/settings/useSettings';
 import { hydrateTimeline } from './lib/timeline/storage';
 
@@ -35,17 +38,26 @@ const formatElapsed = (ms: number): string => {
   return `${pad(m)}:${pad(s)}`;
 };
 
+const initialSession = loadSession();
+
 export const App = (): ReactElement => {
   const { settings, update } = useSettings();
-  const [view, setView] = useState<View>('idle');
-  const [checkActive, setCheckActive] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [view, setView] = useState<View>(
+    initialSession.checkActive && !initialSession.isPaused ? 'active' : 'idle',
+  );
+  const [checkActive, setCheckActive] = useState(initialSession.checkActive);
+  const [isPaused, setIsPaused] = useState(initialSession.isPaused);
   const [miniView, setMiniView] = useState<MiniView>('off');
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(() => {
+    const startedAt = initialSession.runStartedAt;
+    return startedAt !== null
+      ? initialSession.accumulatedMs + Math.max(0, Date.now() - startedAt)
+      : initialSession.accumulatedMs;
+  });
   const previousOnboardingCompleted = useRef<boolean>(settings.onboardingCompleted);
-  const autoStartedRef = useRef(false);
-  const accumulatedMsRef = useRef(0);
-  const runStartedAtRef = useRef<number | null>(null);
+  const autoStartedRef = useRef(initialSession.checkActive);
+  const accumulatedMsRef = useRef(initialSession.accumulatedMs);
+  const runStartedAtRef = useRef<number | null>(initialSession.runStartedAt);
 
   const exitMini = useCallback((): void => {
     setMiniView('off');
@@ -65,6 +77,12 @@ export const App = (): ReactElement => {
     setIsPaused(false);
     setCheckActive(true);
     setView('active');
+    saveSession({
+      checkActive: true,
+      isPaused: false,
+      accumulatedMs: 0,
+      runStartedAt: runStartedAtRef.current,
+    });
   }, []);
 
   const pauseCheck = useCallback((): void => {
@@ -76,12 +94,24 @@ export const App = (): ReactElement => {
     setIsPaused(true);
     setView('idle');
     if (miniView !== 'off') exitMini();
+    saveSession({
+      checkActive: true,
+      isPaused: true,
+      accumulatedMs: accumulatedMsRef.current,
+      runStartedAt: null,
+    });
   }, [exitMini, miniView]);
 
   const resumeCheck = useCallback((): void => {
     runStartedAtRef.current = Date.now();
     setIsPaused(false);
     setView('active');
+    saveSession({
+      checkActive: true,
+      isPaused: false,
+      accumulatedMs: accumulatedMsRef.current,
+      runStartedAt: runStartedAtRef.current,
+    });
   }, []);
 
   const stopCheck = useCallback((): void => {
@@ -92,6 +122,7 @@ export const App = (): ReactElement => {
     setCheckActive(false);
     setView('idle');
     if (miniView !== 'off') exitMini();
+    clearSession();
   }, [exitMini, miniView]);
 
   useEffect(() => {
@@ -107,10 +138,36 @@ export const App = (): ReactElement => {
 
   useEffect(() => {
     if (autoStartedRef.current) return;
-    if (!settings.onboardingCompleted || !settings.autoStart) return;
+    if (!settings.onboardingCompleted) return;
+    if (settings.autoStartMode !== 'on-launch') return;
     autoStartedRef.current = true;
     startCheck();
-  }, [settings.onboardingCompleted, settings.autoStart, startCheck]);
+  }, [settings.onboardingCompleted, settings.autoStartMode, startCheck]);
+
+  useEffect(() => {
+    if (!settings.onboardingCompleted) return;
+    if (settings.autoStartMode !== 'schedule') return;
+
+    const evaluate = (): void => {
+      const inside = isWithinSchedule(settings.schedule);
+      if (inside && !checkActive) {
+        startCheck();
+      } else if (!inside && checkActive) {
+        stopCheck();
+      }
+    };
+
+    evaluate();
+    const id = window.setInterval(evaluate, 30_000);
+    return () => window.clearInterval(id);
+  }, [
+    settings.onboardingCompleted,
+    settings.autoStartMode,
+    settings.schedule,
+    checkActive,
+    startCheck,
+    stopCheck,
+  ]);
 
   useEffect(() => {
     if (!checkActive || isPaused || runStartedAtRef.current === null) return;
@@ -120,6 +177,17 @@ export const App = (): ReactElement => {
       setElapsedMs(accumulatedMsRef.current + (Date.now() - startedAt));
     }, 1000);
     return () => window.clearInterval(id);
+  }, [checkActive, isPaused]);
+
+  useEffect(() => {
+    window.postureApp?.setAnalysisActive?.(checkActive);
+  }, [checkActive]);
+
+  useEffect(() => {
+    if (!checkActive) return;
+    if (isPaused) {
+      window.postureApp?.updateFloating?.({ state: 'inactive', label: 'Pausada', score: 0 });
+    }
   }, [checkActive, isPaused]);
 
   if (!settings.onboardingCompleted) {
@@ -194,6 +262,17 @@ export const App = (): ReactElement => {
                 {isPaused ? 'Análise pausada' : 'Analisando postura'}
               </span>
               <span className="app-bar__badge-time">{formatElapsed(elapsedMs)}</span>
+            </button>
+          ) : null}
+          {checkActive && !isPaused ? (
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Câmera compacta no canto"
+              title="Câmera compacta no canto"
+              onClick={() => enterMini('full')}
+            >
+              <PictureInPicture2 size={20} aria-hidden="true" />
             </button>
           ) : null}
           <button
@@ -313,6 +392,14 @@ const IdlePanel = ({ onStart }: { onStart: () => void }): ReactElement => (
   </section>
 );
 
+const closeAppWindow = (): void => {
+  if (window.postureApp?.window?.close) {
+    window.postureApp.window.close();
+    return;
+  }
+  window.close();
+};
+
 const WindowControls = (): ReactElement => (
   <div className="window-controls" role="group" aria-label="Controles da janela">
     <button
@@ -335,7 +422,7 @@ const WindowControls = (): ReactElement => (
       type="button"
       className="window-controls__btn window-controls__btn--close"
       aria-label="Fechar"
-      onClick={() => window.postureApp?.window?.close()}
+      onClick={closeAppWindow}
     >
       <X size={14} aria-hidden="true" />
     </button>
@@ -345,11 +432,11 @@ const WindowControls = (): ReactElement => (
 const RunningPanel = ({
   elapsedMs,
   onResume,
-  onStop,
+  onPause,
 }: {
   elapsedMs: number;
   onResume: () => void;
-  onStop: () => void;
+  onPause: () => void;
 }): ReactElement => (
   <section className="idle-card">
     <header className="idle-card__header">
@@ -368,8 +455,42 @@ const RunningPanel = ({
         <ArrowLeft size={18} aria-hidden="true" />
         Voltar à câmera
       </button>
-      <button className="button button--text" type="button" onClick={onStop}>
+      <button className="button button--text" type="button" onClick={onPause}>
         <Pause size={18} aria-hidden="true" />
+        Pausar análise
+      </button>
+    </div>
+  </section>
+);
+
+const PausedPanel = ({
+  elapsedMs,
+  onResume,
+  onStop,
+}: {
+  elapsedMs: number;
+  onResume: () => void;
+  onStop: () => void;
+}): ReactElement => (
+  <section className="idle-card">
+    <header className="idle-card__header">
+      <h2 className="idle-card__title">Análise pausada</h2>
+      <p className="idle-card__copy">
+        A câmera foi liberada. Clique em continuar quando estiver pronto para retomar.
+      </p>
+      <p className="idle-card__elapsed idle-card__elapsed--paused" aria-live="polite">
+        <Pause size={16} aria-hidden="true" />
+        <span>Pausada em {formatElapsed(elapsedMs)}</span>
+      </p>
+    </header>
+
+    <div className="idle-card__row">
+      <button className="button button--filled idle-card__cta" type="button" onClick={onResume}>
+        <Play size={18} aria-hidden="true" />
+        Continuar análise
+      </button>
+      <button className="button button--text" type="button" onClick={onStop}>
+        <StopCircle size={18} aria-hidden="true" />
         Parar análise
       </button>
     </div>

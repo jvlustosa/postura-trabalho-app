@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, Menu, screen } from 'electron';
 
 export interface FloatingState {
   state: string;
@@ -6,7 +6,7 @@ export interface FloatingState {
   score: number;
 }
 
-const FLOATING_WIDTH = 168;
+const FLOATING_WIDTH = 172;
 const FLOATING_HEIGHT = 44;
 const FLOATING_MARGIN = 16;
 
@@ -28,28 +28,46 @@ const buildHtml = (): string => `<!doctype html>
         color: #f7fafa;
         -webkit-user-select: none;
         user-select: none;
-        cursor: default;
+        cursor: pointer;
         overflow: hidden;
       }
       body {
         display: flex;
         align-items: center;
         padding: 6px;
-        -webkit-app-region: drag;
       }
       .pill {
         flex: 1;
         height: 100%;
         display: grid;
-        grid-template-columns: 14px 1fr auto;
+        grid-template-columns: 14px 1fr auto auto;
         align-items: center;
         gap: 10px;
         padding: 0 14px;
         border-radius: 9999px;
-        background: rgba(10, 12, 16, 0.86);
-        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(12px);
-        transition: background 200ms ease;
+        background: rgba(10, 12, 16, 0.82);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        transition: background 220ms ease, transform 160ms ease, opacity 160ms ease;
+        opacity: 0.85;
+      }
+      .pill:hover { opacity: 1; transform: translateY(-1px); }
+      .pill:active { transform: translateY(0); }
+      .expand {
+        font-size: 12px;
+        font-weight: 700;
+        opacity: 0;
+        transform: translateX(-4px);
+        transition: opacity 160ms ease, transform 160ms ease;
+        line-height: 1;
+      }
+      .pill:hover .expand { opacity: 0.7; transform: translateX(0); }
+      .drag {
+        position: absolute;
+        inset: 0;
+        -webkit-app-region: drag;
+        pointer-events: none;
       }
       .dot {
         width: 12px;
@@ -93,11 +111,13 @@ const buildHtml = (): string => `<!doctype html>
     </style>
   </head>
   <body>
-    <div class="pill" id="pill" data-state="calibrating">
+    <div class="pill" id="pill" data-state="calibrating" title="Clique para abrir o app • Botão direito para mais opções">
       <span class="dot" aria-hidden="true"></span>
       <span class="label" id="label">Calibrando</span>
       <span class="score" id="score">—</span>
+      <span class="expand" aria-hidden="true">⤢</span>
     </div>
+    <div class="drag" aria-hidden="true"></div>
     <script>
       window.__setFloating = function (payload) {
         try {
@@ -118,6 +138,20 @@ const buildHtml = (): string => `<!doctype html>
           // ignore
         }
       };
+      var pill = document.getElementById('pill');
+      if (pill) {
+        pill.addEventListener('click', function () {
+          if (window.postureApp && window.postureApp.restoreFromFloating) {
+            window.postureApp.restoreFromFloating();
+          }
+        });
+        pill.addEventListener('contextmenu', function (event) {
+          event.preventDefault();
+          if (window.postureApp && window.postureApp.openFloatingMenu) {
+            window.postureApp.openFloatingMenu();
+          }
+        });
+      }
     </script>
   </body>
 </html>`;
@@ -130,7 +164,7 @@ const positionBottomRight = (window: BrowserWindow): void => {
   window.setPosition(x, y);
 };
 
-export const showPostureFloating = (): void => {
+export const showPostureFloating = (preloadPath: string): void => {
   if (floatingWindow && !floatingWindow.isDestroyed()) {
     floatingWindow.showInactive();
     return;
@@ -149,11 +183,12 @@ export const showPostureFloating = (): void => {
     minimizable: false,
     maximizable: false,
     closable: false,
-    focusable: false,
+    focusable: true,
     alwaysOnTop: true,
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -200,4 +235,27 @@ export const updatePostureFloating = (payload: FloatingState): void => {
   floatingWindow.webContents
     .executeJavaScript(`window.__setFloating && window.__setFloating(${safePayload})`)
     .catch(() => undefined);
+};
+
+export const isPostureFloatingVisible = (): boolean =>
+  Boolean(floatingWindow && !floatingWindow.isDestroyed() && floatingWindow.isVisible());
+
+export const openFloatingMenu = (
+  options: { onRestore: () => void; onQuit: () => void },
+): void => {
+  if (!floatingWindow || floatingWindow.isDestroyed()) return;
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Abrir Postura Trabalho',
+      click: () => options.onRestore(),
+    },
+    { type: 'separator' },
+    {
+      label: 'Sair',
+      click: () => options.onQuit(),
+    },
+  ]);
+
+  menu.popup({ window: floatingWindow });
 };

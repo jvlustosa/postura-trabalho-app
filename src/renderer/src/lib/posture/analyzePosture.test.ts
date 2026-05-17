@@ -126,6 +126,51 @@ describe('analyzePosture', () => {
     expect(result.reasons).toContain('head-down');
   });
 
+  it('flags slouch as warning via composite hunch when axes drop subtly', () => {
+    // Shoulders narrow ~4%, torso collapses ~5%, head drops ~5% — each below
+    // its individual warning threshold; together they indicate a hunched back.
+    const landmarks = baseLandmarks().map((l) => {
+      if (l.name === 'leftShoulder') return { ...l, x: 0.3945 };
+      if (l.name === 'rightShoulder') return { ...l, x: 0.6055 };
+      if (l.name === 'leftHip') return { ...l, y: 0.691 };
+      if (l.name === 'rightHip') return { ...l, y: 0.691 };
+      return l;
+    });
+    const result = analyzePosture(landmarks, calibrated());
+    expect(result.reasons).toContain('slouch');
+    expect(result.state).toBe('warning');
+  });
+
+  it('escalates slouch to bad via composite when multiple axes drop together', () => {
+    // Each axis stays below its individual "bad" threshold (~9% deficit),
+    // but the combined deficit pushes the composite over the bad threshold.
+    const landmarks = baseLandmarks().map((l) => {
+      if (l.name === 'leftShoulder') return { ...l, x: 0.3999 };
+      if (l.name === 'rightShoulder') return { ...l, x: 0.6001 };
+      if (l.name === 'leftHip') return { ...l, y: 0.6678 };
+      if (l.name === 'rightHip') return { ...l, y: 0.6678 };
+      if (l.name === 'nose') return { ...l, y: 0.22 };
+      if (l.name === 'leftEar') return { ...l, y: 0.256 };
+      if (l.name === 'rightEar') return { ...l, y: 0.256 };
+      return l;
+    });
+    const result = analyzePosture(landmarks, calibrated());
+    expect(result.reasons).toContain('slouch');
+    expect(result.state).toBe('bad');
+  });
+
+  it('does not trigger composite slouch when only one axis drops', () => {
+    // Head drops significantly but shoulders and torso are unchanged.
+    // Composite must not promote this to a back-curvature alert.
+    const landmarks = baseLandmarks().map((l) => {
+      if (l.name === 'nose') return { ...l, y: 0.27 };
+      if (l.name === 'leftEar' || l.name === 'rightEar') return { ...l, y: 0.28 };
+      return l;
+    });
+    const result = analyzePosture(landmarks, calibrated());
+    expect(result.reasons).not.toContain('slouch');
+  });
+
   it('does not flag slouch without calibrated baselines', () => {
     const landmarks = baseLandmarks().map((l) => {
       if (l.name === 'leftShoulder') return { ...l, x: 0.44 };

@@ -11,12 +11,15 @@ export interface CreatePostureWatcherOptions {
   warningThresholdMs: number | (() => number);
   badThresholdMs: number | (() => number);
   cooldownMs?: number;
+  /** Required duration of sustained 'good' frames before accumulated bad/warning timers are cleared. Defaults to 1500ms so brief detection blips do not reset the countdown. */
+  goodHysteresisMs?: number;
   onAlert: (payload: { level: AlertLevel; reasons: PostureReason[]; durationMs: number }) => void;
   onClear?: () => void;
 }
 
 export const createPostureWatcher = (options: CreatePostureWatcherOptions): PostureWatcher => {
   const cooldownMs = options.cooldownMs ?? 120_000;
+  const goodHysteresisMs = options.goodHysteresisMs ?? 1_500;
   const getWarningMs = (): number =>
     typeof options.warningThresholdMs === 'function'
       ? options.warningThresholdMs()
@@ -28,6 +31,7 @@ export const createPostureWatcher = (options: CreatePostureWatcherOptions): Post
 
   let warningSince: number | null = null;
   let badSince: number | null = null;
+  let goodSince: number | null = null;
   let activeLevel: AlertLevel | null = null;
   let cooldownUntil = 0;
 
@@ -38,6 +42,7 @@ export const createPostureWatcher = (options: CreatePostureWatcherOptions): Post
     }
     warningSince = null;
     badSince = null;
+    goodSince = null;
   };
 
   const tryAlert = (level: AlertLevel, reasons: PostureReason[], durationMs: number, now: number): void => {
@@ -54,10 +59,22 @@ export const createPostureWatcher = (options: CreatePostureWatcherOptions): Post
 
   return {
     observe(state, reasons, now = Date.now()): void {
-      if (state === 'good' || state === 'calibrating' || state === 'inactive') {
+      if (state === 'calibrating' || state === 'inactive') {
         clear();
         return;
       }
+
+      if (state === 'good') {
+        goodSince ??= now;
+        if (now - goodSince >= goodHysteresisMs) {
+          clear();
+        }
+        return;
+      }
+
+      // Any tracked-bad-posture frame resets the good streak; the accumulated
+      // warning/bad timers below survive brief detection blips.
+      goodSince = null;
 
       if (state === 'bad') {
         warningSince ??= now;
@@ -92,6 +109,7 @@ export const createPostureWatcher = (options: CreatePostureWatcherOptions): Post
     reset(): void {
       warningSince = null;
       badSince = null;
+      goodSince = null;
       activeLevel = null;
       cooldownUntil = 0;
     },

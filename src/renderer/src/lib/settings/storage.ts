@@ -1,10 +1,14 @@
 import type { PostureThresholds } from '../posture/types';
 import {
+  defaultSchedule,
   defaultSettings,
   type AlertThresholdSeconds,
   type AppSettings,
+  type AutoStartMode,
   type CalibrationData,
+  type ScheduleConfig,
   type SensitivityLevel,
+  type Weekday,
 } from './types';
 
 const STORAGE_KEY = 'postura-trabalho.settings.v1';
@@ -12,6 +16,34 @@ const STORAGE_KEY = 'postura-trabalho.settings.v1';
 const sensitivityValues: readonly SensitivityLevel[] = ['relaxed', 'standard', 'strict'];
 const calibrationValues: readonly AppSettings['calibrationSeconds'][] = [3, 5, 8];
 const alertThresholdValues: readonly AlertThresholdSeconds[] = [30, 60, 120, 180];
+const autoStartModeValues: readonly AutoStartMode[] = ['off', 'on-launch', 'schedule'];
+const weekdayValues: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const parseTime = (raw: unknown, fallback: string): string =>
+  typeof raw === 'string' && TIME_RE.test(raw) ? raw : fallback;
+
+const parseSchedule = (raw: unknown): ScheduleConfig => {
+  if (typeof raw !== 'object' || raw === null) return defaultSchedule;
+  const candidate = raw as Partial<ScheduleConfig>;
+
+  const weekdays = Array.isArray(candidate.weekdays)
+    ? Array.from(
+        new Set(
+          candidate.weekdays.filter((d): d is Weekday =>
+            weekdayValues.includes(d as Weekday),
+          ),
+        ),
+      ).sort((a, b) => a - b)
+    : defaultSchedule.weekdays;
+
+  return {
+    weekdays,
+    startTime: parseTime(candidate.startTime, defaultSchedule.startTime),
+    endTime: parseTime(candidate.endTime, defaultSchedule.endTime),
+  };
+};
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
@@ -42,18 +74,18 @@ const parseThresholds = (raw: unknown): PostureThresholds | null => {
     neckWarning: c.neckWarning,
     neckBad: c.neckBad,
     shoulderWidthBaseline: isFiniteNumber(c.shoulderWidthBaseline) ? c.shoulderWidthBaseline : 0,
-    shoulderNarrowWarning: isFiniteNumber(c.shoulderNarrowWarning) ? c.shoulderNarrowWarning : 0.9,
-    shoulderNarrowBad: isFiniteNumber(c.shoulderNarrowBad) ? c.shoulderNarrowBad : 0.8,
+    shoulderNarrowWarning: isFiniteNumber(c.shoulderNarrowWarning) ? c.shoulderNarrowWarning : 0.94,
+    shoulderNarrowBad: isFiniteNumber(c.shoulderNarrowBad) ? c.shoulderNarrowBad : 0.86,
     torsoAspectRatioBaseline: isFiniteNumber(c.torsoAspectRatioBaseline)
       ? c.torsoAspectRatioBaseline
       : 0,
     headVerticalRatioBaseline: isFiniteNumber(c.headVerticalRatioBaseline)
       ? c.headVerticalRatioBaseline
       : 0,
-    slouchWarning: isFiniteNumber(c.slouchWarning) ? c.slouchWarning : 0.9,
-    slouchBad: isFiniteNumber(c.slouchBad) ? c.slouchBad : 0.78,
-    headDownWarning: isFiniteNumber(c.headDownWarning) ? c.headDownWarning : 0.88,
-    headDownBad: isFiniteNumber(c.headDownBad) ? c.headDownBad : 0.72,
+    slouchWarning: isFiniteNumber(c.slouchWarning) ? c.slouchWarning : 0.93,
+    slouchBad: isFiniteNumber(c.slouchBad) ? c.slouchBad : 0.84,
+    headDownWarning: isFiniteNumber(c.headDownWarning) ? c.headDownWarning : 0.92,
+    headDownBad: isFiniteNumber(c.headDownBad) ? c.headDownBad : 0.82,
   };
 };
 
@@ -125,13 +157,30 @@ const parseSettings = (raw: unknown): AppSettings => {
     )
       ? (c.alertThresholdSeconds as AlertThresholdSeconds)
       : defaultSettings.alertThresholdSeconds,
+    alertSound:
+      typeof c.alertSound === 'boolean' ? c.alertSound : defaultSettings.alertSound,
     floatingWindow:
       typeof c.floatingWindow === 'boolean' ? c.floatingWindow : defaultSettings.floatingWindow,
+    floatingOpacity: isFiniteNumber(c.floatingOpacity)
+      ? Math.min(1, Math.max(0.3, c.floatingOpacity))
+      : defaultSettings.floatingOpacity,
     compactMode:
       typeof c.compactMode === 'boolean' ? c.compactMode : defaultSettings.compactMode,
-    autoStart:
-      typeof c.autoStart === 'boolean' ? c.autoStart : defaultSettings.autoStart,
+    autoStartMode: resolveAutoStartMode(c),
+    schedule: parseSchedule(c.schedule),
   };
+};
+
+const resolveAutoStartMode = (
+  c: Partial<AppSettings> & { autoStart?: unknown },
+): AutoStartMode => {
+  if (autoStartModeValues.includes(c.autoStartMode as AutoStartMode)) {
+    return c.autoStartMode as AutoStartMode;
+  }
+  if (typeof c.autoStart === 'boolean') {
+    return c.autoStart ? 'on-launch' : 'off';
+  }
+  return defaultSettings.autoStartMode;
 };
 
 const getBridge = (): NonNullable<Window['postureApp']>['storage'] | undefined => {

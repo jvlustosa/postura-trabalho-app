@@ -9,14 +9,14 @@ const baseThresholds: PostureThresholds = {
   neckWarning: 0.09,
   neckBad: 0.18,
   shoulderWidthBaseline: 0,
-  shoulderNarrowWarning: 0.9,
-  shoulderNarrowBad: 0.8,
+  shoulderNarrowWarning: 0.94,
+  shoulderNarrowBad: 0.86,
   torsoAspectRatioBaseline: 0,
   headVerticalRatioBaseline: 0,
-  slouchWarning: 0.9,
-  slouchBad: 0.78,
-  headDownWarning: 0.88,
-  headDownBad: 0.72,
+  slouchWarning: 0.93,
+  slouchBad: 0.84,
+  headDownWarning: 0.92,
+  headDownBad: 0.82,
 };
 
 const median = (values: number[]): number => {

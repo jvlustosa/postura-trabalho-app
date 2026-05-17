@@ -1,5 +1,5 @@
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Crosshair, Flame, Minimize2, Maximize2, RotateCcw, Sparkles } from 'lucide-react';
+import { Camera, Crosshair, Flame, Maximize2, PictureInPicture2, RotateCcw, Sparkles } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
 import type { MiniView } from '../App';
@@ -167,6 +167,33 @@ export const PostureCheck = ({
   const showOverlayRef = useRef(settings.showOverlay);
   const alertsEnabledRef = useRef(settings.alertsEnabled);
   const alertThresholdMsRef = useRef(settings.alertThresholdSeconds * 1_000);
+  const alertSoundRef = useRef(settings.alertSound);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playAlertTone = useCallback((level: AlertLevel): void => {
+    if (typeof window === 'undefined') return;
+    const Ctor =
+      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    try {
+      audioContextRef.current ??= new Ctor();
+      const ctx = audioContextRef.current;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(level === 'bad' ? 660 : 880, now);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } catch {
+      // audio playback may fail without user gesture; ignore
+    }
+  }, []);
 
   const smoother = useMemo(() => createPostureSmoother(8), []);
   const landmarkSmoother = useMemo(() => createLandmarkSmoother(0.4), []);
@@ -178,18 +205,36 @@ export const PostureCheck = ({
         badThresholdMs: () => alertThresholdMsRef.current,
         onAlert: ({ level, reasons }) => {
           if (!alertsEnabledRef.current) return;
-          window.postureApp?.showAlert(level, buildAlertMessage(level, reasons));
+          const message = buildAlertMessage(level, reasons);
+          window.postureApp?.showAlert(level, message);
+          window.postureApp?.notify?.(level, message);
+          if (alertSoundRef.current) playAlertTone(level);
         },
         onClear: () => {
           window.postureApp?.hideAlert();
         },
       }),
-    [],
+    [playAlertTone],
   );
 
   const streakStartRef = useRef<number | null>(null);
   const scoreHistoryRef = useRef<number[]>([]);
   const lastScoreSampleRef = useRef(0);
+  const lastFloatingPushRef = useRef(0);
+  const lastFloatingStateRef = useRef<PostureState | null>(null);
+
+  const pushFloating = useCallback((state: PostureState, score: number, label?: string): void => {
+    const now = performance.now();
+    if (state !== lastFloatingStateRef.current || now - lastFloatingPushRef.current >= 500) {
+      lastFloatingStateRef.current = state;
+      lastFloatingPushRef.current = now;
+      window.postureApp?.updateFloating?.({
+        state,
+        label: label ?? statusLabels[state],
+        score: Math.round(score ?? 0),
+      });
+    }
+  }, []);
 
   const [analysis, setAnalysis] = useState<PostureAnalysis>(initialAnalysis);
   const [awaitingUpright, setAwaitingUpright] = useState(false);
@@ -251,6 +296,18 @@ export const PostureCheck = ({
   useEffect(() => {
     alertThresholdMsRef.current = settings.alertThresholdSeconds * 1_000;
   }, [settings.alertThresholdSeconds]);
+
+  useEffect(() => {
+    alertSoundRef.current = settings.alertSound;
+  }, [settings.alertSound]);
+
+  useEffect(
+    () => () => {
+      audioContextRef.current?.close().catch(() => undefined);
+      audioContextRef.current = null;
+    },
+    [],
+  );
 
   // Restore saved calibration on mount (only if baselines are present)
   useEffect(() => {
@@ -373,6 +430,7 @@ export const PostureCheck = ({
         setAwaitingUpright(false);
         setCalibrationProgress(0);
         setAnalysis(rawAnalysis);
+        pushFloating('calibrating', 0, 'Calibrando');
         return;
       }
 
@@ -387,6 +445,7 @@ export const PostureCheck = ({
             reasons: [],
             message: 'Sente-se ereto para calibrar',
           });
+          pushFloating('calibrating', 0, 'Sente-se ereto');
           return;
         }
 
@@ -423,6 +482,7 @@ export const PostureCheck = ({
             reasons: [],
             message: 'Mantenha postura ereta',
           });
+          pushFloating('calibrating', 0, 'Calibrando');
           return;
         }
       }
@@ -434,6 +494,7 @@ export const PostureCheck = ({
       postureWatcher.observe(nextAnalysis.state, nextAnalysis.reasons);
       timelineRecorder.observe(nextAnalysis.state);
       setAnalysis(nextAnalysis);
+      pushFloating(nextAnalysis.state, nextAnalysis.score);
 
       if (nextAnalysis.state === 'good') {
         if (streakStartRef.current === null) {
@@ -481,6 +542,7 @@ export const PostureCheck = ({
           diagnosticCaptureRef.current = { error, stream: null };
           setErrorDetails(formatMediaErrorDetails(error));
           setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
+          pushFloating('camera-error', 0, 'Sem câmera');
         }
         return;
       }
@@ -503,6 +565,7 @@ export const PostureCheck = ({
           diagnosticCaptureRef.current = { error, stream: streamRef.current };
           setErrorDetails(formatMediaErrorDetails(error));
           setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
+          pushFloating('camera-error', 0, 'Sem câmera');
         }
         return;
       }
@@ -515,6 +578,7 @@ export const PostureCheck = ({
           diagnosticCaptureRef.current = { error, stream: streamRef.current };
           setErrorDetails(formatMediaErrorDetails(error));
           setAnalysis({ ...initialAnalysis, state: 'model-error', message: 'Falha ao carregar o detector de pose.' });
+          pushFloating('model-error', 0, 'Erro modelo');
         }
         return;
       }
@@ -550,7 +614,7 @@ export const PostureCheck = ({
       scoreHistoryRef.current = [];
       lastScoreSampleRef.current = 0;
     };
-  }, [smoother, landmarkSmoother, postureWatcher, timelineRecorder, persistCalibration]);
+  }, [smoother, landmarkSmoother, postureWatcher, timelineRecorder, persistCalibration, pushFloating]);
 
   const isError = analysis.state === 'camera-error' || analysis.state === 'model-error';
   const isActive = analysis.state === 'good' || analysis.state === 'warning' || analysis.state === 'bad';
@@ -694,11 +758,11 @@ export const PostureCheck = ({
           <button
             className="icon-button"
             type="button"
-            aria-label="Abrir em janela flutuante"
-            title="Modo flutuante"
+            aria-label="Câmera compacta no canto"
+            title="Câmera compacta no canto"
             onClick={() => onChangeMiniView?.('full')}
           >
-            <Minimize2 size={20} aria-hidden="true" />
+            <PictureInPicture2 size={20} aria-hidden="true" />
           </button>
           <button className="button button--text" type="button" onClick={onStop}>
             Pausar

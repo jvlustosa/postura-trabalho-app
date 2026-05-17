@@ -9,17 +9,21 @@ const defaultThresholds: PostureThresholds = {
   neckWarning: 0.09,
   neckBad: 0.18,
   shoulderWidthBaseline: 0,
-  shoulderNarrowWarning: 0.9,
-  shoulderNarrowBad: 0.8,
+  shoulderNarrowWarning: 0.94,
+  shoulderNarrowBad: 0.86,
   torsoAspectRatioBaseline: 0,
   headVerticalRatioBaseline: 0,
-  slouchWarning: 0.9,
-  slouchBad: 0.78,
-  headDownWarning: 0.88,
-  headDownBad: 0.72,
+  slouchWarning: 0.93,
+  slouchBad: 0.84,
+  headDownWarning: 0.92,
+  headDownBad: 0.82,
 };
 
 const MIN_SHOULDER_WIDTH = 0.04;
+
+const HUNCH_SIGNIFICANT_DEFICIT = 0.03;
+const HUNCH_COMPOSITE_WARNING = 0.12;
+const HUNCH_COMPOSITE_BAD = 0.22;
 
 const requiredLandmarks: LandmarkName[] = ['nose', 'leftShoulder', 'rightShoulder'];
 
@@ -120,7 +124,12 @@ export const analyzePosture = (
   }
 
   // Slouch via shoulder narrowing (works without hips — primary detection)
-  if (thresholds.shoulderWidthBaseline > 0 && shoulderWidth > 0) {
+  const hasWidthBaseline = thresholds.shoulderWidthBaseline > 0 && shoulderWidth > 0;
+  const widthDeficit = hasWidthBaseline
+    ? Math.max(0, 1 - shoulderWidth / thresholds.shoulderWidthBaseline)
+    : 0;
+
+  if (hasWidthBaseline) {
     const widthRatio = shoulderWidth / thresholds.shoulderWidthBaseline;
 
     if (widthRatio <= thresholds.shoulderNarrowBad) {
@@ -132,13 +141,14 @@ export const analyzePosture = (
     }
   }
 
-  // Slouch via torso collapse (hip-based, when hips visible and not already flagged)
-  if (
-    !reasons.includes('slouch') &&
-    hipsVisible &&
-    thresholds.torsoAspectRatioBaseline > 0 &&
-    torsoAspectRatio > 0
-  ) {
+  // Slouch via torso collapse (hip-based, when hips visible)
+  const hasTorsoBaseline =
+    hipsVisible && thresholds.torsoAspectRatioBaseline > 0 && torsoAspectRatio > 0;
+  const torsoDeficit = hasTorsoBaseline
+    ? Math.max(0, 1 - torsoAspectRatio / thresholds.torsoAspectRatioBaseline)
+    : 0;
+
+  if (!reasons.includes('slouch') && hasTorsoBaseline) {
     const ratio = torsoAspectRatio / thresholds.torsoAspectRatioBaseline;
 
     if (ratio <= thresholds.slouchBad) {
@@ -151,7 +161,13 @@ export const analyzePosture = (
   }
 
   // Head dropping toward shoulders
-  if (thresholds.headVerticalRatioBaseline > 0 && headVerticalRatio > 0) {
+  const hasHeadVerticalBaseline =
+    thresholds.headVerticalRatioBaseline > 0 && headVerticalRatio > 0;
+  const headDownDeficit = hasHeadVerticalBaseline
+    ? Math.max(0, 1 - headVerticalRatio / thresholds.headVerticalRatioBaseline)
+    : 0;
+
+  if (hasHeadVerticalBaseline) {
     const ratio = headVerticalRatio / thresholds.headVerticalRatioBaseline;
 
     if (ratio <= thresholds.headDownBad) {
@@ -159,6 +175,33 @@ export const analyzePosture = (
       severity = Math.max(severity, 2);
     } else if (ratio <= thresholds.headDownWarning) {
       reasons.push('head-down');
+      severity = Math.max(severity, 1);
+    }
+  }
+
+  // Composite hunched-back detection: combines sub-warning signals across
+  // shoulder narrowing, torso collapse and head dropping. Catches subtle
+  // curvature where each axis alone is below threshold but the overall
+  // posture clearly indicates a curved upper back. Requires at least two
+  // axes with meaningful deficit so a single isolated signal (e.g. only
+  // head drop) cannot masquerade as a back-curvature problem.
+  const availableSignals =
+    (hasWidthBaseline ? 1 : 0) + (hasTorsoBaseline ? 1 : 0) + (hasHeadVerticalBaseline ? 1 : 0);
+  const significantSignals = [widthDeficit, torsoDeficit, headDownDeficit].filter(
+    (deficit) => deficit >= HUNCH_SIGNIFICANT_DEFICIT,
+  ).length;
+
+  if (availableSignals >= 2 && significantSignals >= 2) {
+    const composite = widthDeficit + torsoDeficit + headDownDeficit;
+    const addSlouch = (): void => {
+      if (!reasons.includes('slouch')) reasons.push('slouch');
+    };
+
+    if (composite >= HUNCH_COMPOSITE_BAD) {
+      addSlouch();
+      severity = Math.max(severity, 2);
+    } else if (composite >= HUNCH_COMPOSITE_WARNING) {
+      addSlouch();
       severity = Math.max(severity, 1);
     }
   }

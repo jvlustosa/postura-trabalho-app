@@ -26,7 +26,10 @@ Baixe a versão mais recente na página de [Releases](../../releases):
 - `npm test` — roda testes unitários
 - `npm run lint` — roda ESLint
 - `npm run build` — copia assets locais da MediaPipe, valida TypeScript e gera `out`
-- `npm run dist:linux` — gera AppImage e `.deb`
+- `npm run postura:dist` — gera AppImage (Linux)
+- `npm run postura:dist:deb` — gera AppImage e `.deb` (Linux)
+- `npm run postura:install` — copia o AppImage para `~/Applications` e registra no menu
+- `npm run postura:reinstall` — build + instalação local (atalho: `npm run reinstall`)
 - `npm run dist:win` — gera NSIS e portable para Windows
 - `npm run dist:mac` — gera DMG e zip para macOS (Intel + Apple Silicon)
 

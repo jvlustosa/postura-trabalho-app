@@ -8,10 +8,10 @@
     "dev": "electron-vite dev",
     "build": "npm run copy:mediapipe && npm run typecheck && electron-vite build",
     "dist": "npm run build && electron-builder",
-    "predist:linux": "rm -rf release/linux-unpacked",
-    "dist:linux": "npm run build && electron-builder --linux AppImage",
-    "predist:linux:deb": "rm -rf release/linux-unpacked",
-    "dist:linux:deb": "npm run build && electron-builder --linux AppImage deb",
+    "prepostura:dist": "rm -rf release/linux-unpacked",
+    "postura:dist": "npm run build && electron-builder --linux AppImage",
+    "prepostura:dist:deb": "rm -rf release/linux-unpacked",
+    "postura:dist:deb": "npm run build && electron-builder --linux AppImage deb",
     "dist:win": "npm run build && electron-builder --win nsis portable",
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "test": "vitest run",
@@ -19,7 +19,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "copy:mediapipe": "node scripts/copy-mediapipe-assets.mjs",
-    "install:linux": "bash scripts/install-linux-appimage.sh"
+    "postura:install": "bash scripts/install-postura-appimage.sh",
+    "postura:reinstall": "npm run postura:dist && npm run postura:install",
+    "reinstall": "npm run postura:reinstall"
   },
   "keywords": [],
   "author": {

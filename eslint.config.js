@@ -16,4 +16,14 @@ export default tseslint.config(
       },
     },
   },
+  {
+    files: ['landing/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        alert: 'readonly',
+      },
+    },
+  },
 );

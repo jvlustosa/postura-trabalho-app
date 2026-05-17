@@ -47,7 +47,7 @@ if [[ -f "$SRC" ]]; then
   fi
 else
   echo "Aviso: AppImage não encontrado em $SRC — só ícone e atalho foram atualizados." >&2
-  echo "Gere com: npm run build && npx electron-builder --linux AppImage" >&2
+  echo "Gere com: npm run postura:dist" >&2
 fi
 
 cat > "$DESKTOP" <<EOF

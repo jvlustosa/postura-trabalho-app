@@ -12,11 +12,32 @@ contextBridge.exposeInMainWorld('postureApp', {
   hideAlert: (): void => {
     ipcRenderer.send('posture-alert:hide');
   },
+  notify: (level: string, message: string): void => {
+    ipcRenderer.send('posture-notify', { level, message });
+  },
   enterMini: (): void => {
     ipcRenderer.send('posture-mini:enter');
   },
   exitMini: (): void => {
     ipcRenderer.send('posture-mini:exit');
+  },
+  updateFloating: (payload: { state: string; label: string; score: number }): void => {
+    ipcRenderer.send('posture-floating:update', payload);
+  },
+  setAnalysisActive: (active: boolean): void => {
+    ipcRenderer.send('posture-floating:set-active', active);
+  },
+  restoreFromFloating: (): void => {
+    ipcRenderer.send('posture-floating:restore');
+  },
+  showFloating: (): void => {
+    ipcRenderer.send('posture-floating:show');
+  },
+  openFloatingMenu: (): void => {
+    ipcRenderer.send('posture-floating:menu');
+  },
+  quit: (): void => {
+    ipcRenderer.send('app:quit');
   },
   window: {
     minimize: (): void => {

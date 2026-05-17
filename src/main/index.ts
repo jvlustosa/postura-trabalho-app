@@ -1,10 +1,18 @@
-import { app, BrowserWindow, ipcMain, screen, session } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, screen, session } from 'electron';
 import electronUpdater from 'electron-updater';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { readJsonFile, writeJsonFile } from './persistentStore';
 import { type AlertLevel, hidePostureAlert, showPostureAlert } from './postureAlertWindow';
+import {
+  type FloatingState,
+  hidePostureFloating,
+  isPostureFloatingVisible,
+  openFloatingMenu,
+  showPostureFloating,
+  updatePostureFloating,
+} from './postureFloatingWindow';
 
 const { autoUpdater } = electronUpdater;
 
@@ -14,6 +22,10 @@ autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 const VALID_LEVELS: AlertLevel[] = ['warning', 'bad'];
+const NOTIFICATION_TITLES: Record<AlertLevel, string> = {
+  warning: 'Atenção à postura',
+  bad: 'Hora de ajustar a postura',
+};
 
 const SETTINGS_FILE = 'settings.json';
 const TIMELINE_FILE = 'timeline.json';
@@ -23,6 +35,8 @@ const writeQueue = new Map<string, Promise<void>>();
 const MINI_WIDTH = 320;
 const MINI_HEIGHT = 240;
 const MINI_MARGIN = 16;
+
+const PRELOAD_PATH = join(__dirname, '../preload/index.js');
 
 interface MiniSnapshot {
   bounds: Electron.Rectangle;
@@ -34,6 +48,9 @@ interface MiniSnapshot {
 
 let mainWindow: BrowserWindow | null = null;
 let miniSnapshot: MiniSnapshot | null = null;
+let isQuitting = false;
+let analysisActive = false;
+let lastFloatingState: FloatingState = { state: 'inactive', label: 'Inativo', score: 0 };
 /** True after electron-updater fetched a build; Ctrl/Cmd+Shift+R then restarts into the new version. */
 let updateDownloaded = false;
 
@@ -92,6 +109,32 @@ const exitMiniMode = (): void => {
   window.setBounds(snap.bounds, true);
 };
 
+const restoreMainWindow = (): void => {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) return;
+  if (!window.isVisible()) window.show();
+  if (window.isMinimized()) window.restore();
+  window.focus();
+  hidePostureFloating();
+};
+
+const sendToBackground = (): void => {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) return;
+  if (miniSnapshot) exitMiniMode();
+  hidePostureAlert();
+  if (window.isVisible()) window.hide();
+  showPostureFloating(PRELOAD_PATH);
+  updatePostureFloating(lastFloatingState);
+};
+
+const quitApp = (): void => {
+  isQuitting = true;
+  hidePostureFloating();
+  hidePostureAlert();
+  app.quit();
+};
+
 const queueWrite = (fileName: string, data: unknown): Promise<void> => {
   const previous = writeQueue.get(fileName) ?? Promise.resolve();
   const next = previous.then(() => writeJsonFile(fileName, data)).catch(() => undefined);
@@ -118,21 +161,33 @@ const createWindow = (): void => {
     titleBarStyle: 'hidden',
     titleBarOverlay: false,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 
   mainWindow = window;
 
+  window.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    sendToBackground();
+  });
+
   window.on('closed', () => {
     hidePostureAlert();
+    hidePostureFloating();
     if (mainWindow === window) {
       mainWindow = null;
       miniSnapshot = null;
     }
+  });
+
+  window.on('show', () => {
+    hidePostureFloating();
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -142,6 +197,22 @@ const createWindow = (): void => {
   }
 
   attachHardReloadShortcut(window);
+};
+
+const showNativeNotification = (level: AlertLevel, message: string): void => {
+  if (!Notification.isSupported()) return;
+  try {
+    const notification = new Notification({
+      title: NOTIFICATION_TITLES[level],
+      body: message,
+      silent: false,
+      urgency: level === 'bad' ? 'critical' : 'normal',
+    });
+    notification.on('click', () => restoreMainWindow());
+    notification.show();
+  } catch {
+    // older Linux desktops may throw — fail silently
+  }
 };
 
 const registerIpcHandlers = (): void => {
@@ -157,10 +228,64 @@ const registerIpcHandlers = (): void => {
       typeof message === 'string' ? message : 'Reajuste sua postura.';
 
     showPostureAlert(alertLevel, alertMessage);
+
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      showNativeNotification(alertLevel, alertMessage);
+    }
   });
 
   ipcMain.on('posture-alert:hide', () => {
     hidePostureAlert();
+  });
+
+  ipcMain.on('posture-notify', (_event, payload: unknown) => {
+    if (typeof payload !== 'object' || payload === null) return;
+    const { level, message } = payload as { level?: unknown; message?: unknown };
+    const lvl: AlertLevel =
+      typeof level === 'string' && VALID_LEVELS.includes(level as AlertLevel)
+        ? (level as AlertLevel)
+        : 'bad';
+    const msg = typeof message === 'string' ? message : 'Reajuste sua postura.';
+    showNativeNotification(lvl, msg);
+  });
+
+  ipcMain.on('posture-floating:update', (_event, payload: unknown) => {
+    if (typeof payload !== 'object' || payload === null) return;
+    const { state, label, score } = payload as {
+      state?: unknown;
+      label?: unknown;
+      score?: unknown;
+    };
+    lastFloatingState = {
+      state: typeof state === 'string' ? state : lastFloatingState.state,
+      label: typeof label === 'string' ? label : lastFloatingState.label,
+      score: typeof score === 'number' && Number.isFinite(score) ? score : lastFloatingState.score,
+    };
+    if (isPostureFloatingVisible()) {
+      updatePostureFloating(lastFloatingState);
+    }
+  });
+
+  ipcMain.on('posture-floating:set-active', (_event, active: unknown) => {
+    analysisActive = Boolean(active);
+    if (!analysisActive && isPostureFloatingVisible()) {
+      hidePostureFloating();
+    }
+  });
+
+  ipcMain.on('posture-floating:restore', () => {
+    restoreMainWindow();
+  });
+
+  ipcMain.on('posture-floating:show', () => {
+    sendToBackground();
+  });
+
+  ipcMain.on('posture-floating:menu', () => {
+    openFloatingMenu({
+      onRestore: () => restoreMainWindow(),
+      onQuit: () => quitApp(),
+    });
   });
 
   ipcMain.on('posture-mini:enter', () => {
@@ -171,21 +296,40 @@ const registerIpcHandlers = (): void => {
     exitMiniMode();
   });
 
-  ipcMain.on('window:minimize', () => {
-    mainWindow?.minimize();
+  const senderWindow = (event: Electron.IpcMainEvent): BrowserWindow | null => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      return win;
+    }
+    return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  };
+
+  ipcMain.on('window:minimize', (event) => {
+    senderWindow(event)?.minimize();
   });
 
-  ipcMain.on('window:toggle-maximize', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
+  ipcMain.on('window:toggle-maximize', (event) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    if (win.isMaximized()) {
+      win.unmaximize();
     } else {
-      mainWindow.maximize();
+      win.maximize();
     }
   });
 
-  ipcMain.on('window:close', () => {
-    mainWindow?.close();
+  ipcMain.on('window:close', (event) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    if (win === mainWindow && analysisActive) {
+      sendToBackground();
+      return;
+    }
+    win.close();
+  });
+
+  ipcMain.on('app:quit', () => {
+    quitApp();
   });
 
   ipcMain.handle('storage:read-settings', async () => {
@@ -238,12 +382,19 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+    } else if (mainWindow && !mainWindow.isVisible()) {
+      restoreMainWindow();
     }
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
   hidePostureAlert();
+  hidePostureFloating();
   if (process.platform !== 'darwin') {
     app.quit();
   }

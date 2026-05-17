@@ -3,6 +3,16 @@ import type { PostureThresholds } from '../posture/types';
 export type SensitivityLevel = 'relaxed' | 'standard' | 'strict';
 export type AlertThresholdSeconds = 30 | 60 | 120 | 180;
 
+export type AutoStartMode = 'off' | 'on-launch' | 'schedule';
+
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface ScheduleConfig {
+  weekdays: Weekday[];
+  startTime: string;
+  endTime: string;
+}
+
 export interface CalibrationData {
   thresholds: PostureThresholds;
   baseline: {
@@ -27,10 +37,19 @@ export interface AppSettings {
   calibration: CalibrationData | null;
   alertsEnabled: boolean;
   alertThresholdSeconds: AlertThresholdSeconds;
+  alertSound: boolean;
   floatingWindow: boolean;
+  floatingOpacity: number;
   compactMode: boolean;
-  autoStart: boolean;
+  autoStartMode: AutoStartMode;
+  schedule: ScheduleConfig;
 }
+
+export const defaultSchedule: ScheduleConfig = {
+  weekdays: [1, 2, 3, 4, 5],
+  startTime: '09:00',
+  endTime: '18:00',
+};
 
 export const defaultSettings: AppSettings = {
   sensitivity: 'standard',
@@ -41,8 +60,11 @@ export const defaultSettings: AppSettings = {
   screenHeight: 50,
   calibration: null,
   alertsEnabled: true,
-  alertThresholdSeconds: 120,
-  floatingWindow: false,
+  alertThresholdSeconds: 30,
+  alertSound: false,
+  floatingWindow: true,
+  floatingOpacity: 0.85,
   compactMode: false,
-  autoStart: false,
+  autoStartMode: 'off',
+  schedule: defaultSchedule,
 };
