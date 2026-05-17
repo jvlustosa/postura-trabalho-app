@@ -9,17 +9,19 @@ export interface FloatingState {
 const FLOATING_WIDTH = 172;
 const FLOATING_HEIGHT = 44;
 const FLOATING_MARGIN = 16;
+const DEFAULT_OPACITY = 0.85;
 
 let floatingWindow: BrowserWindow | null = null;
+let currentOpacity = DEFAULT_OPACITY;
 
-const buildHtml = (): string => `<!doctype html>
+const buildHtml = (initialOpacity: number): string => `<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
     <title>Postura</title>
     <style>
-      :root { color-scheme: dark; }
+      :root { color-scheme: dark; --pill-opacity: ${initialOpacity}; }
       html, body {
         margin: 0;
         height: 100%;
@@ -50,7 +52,7 @@ const buildHtml = (): string => `<!doctype html>
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         transition: background 220ms ease, transform 160ms ease, opacity 160ms ease;
-        opacity: 0.85;
+        opacity: var(--pill-opacity, 0.85);
       }
       .pill:hover { opacity: 1; transform: translateY(-1px); }
       .pill:active { transform: translateY(0); }
@@ -114,11 +116,20 @@ const buildHtml = (): string => `<!doctype html>
     <div class="pill" id="pill" data-state="calibrating" title="Clique para abrir o app • Botão direito para mais opções">
       <span class="dot" aria-hidden="true"></span>
       <span class="label" id="label">Calibrando</span>
-      <span class="score" id="score">—</span>
+      <span class="score" id="score">-</span>
       <span class="expand" aria-hidden="true">⤢</span>
     </div>
     <div class="drag" aria-hidden="true"></div>
     <script>
+      window.__setFloatingOpacity = function (opacity) {
+        try {
+          if (typeof opacity === 'number' && isFinite(opacity)) {
+            document.documentElement.style.setProperty('--pill-opacity', String(opacity));
+          }
+        } catch (error) {
+          // ignore
+        }
+      };
       window.__setFloating = function (payload) {
         try {
           var pill = document.getElementById('pill');
@@ -131,7 +142,7 @@ const buildHtml = (): string => `<!doctype html>
             if (typeof payload.score === 'number' && isFinite(payload.score)) {
               score.textContent = Math.round(payload.score) + '';
             } else {
-              score.textContent = '—';
+              score.textContent = '-';
             }
           }
         } catch (error) {
@@ -164,8 +175,11 @@ const positionBottomRight = (window: BrowserWindow): void => {
   window.setPosition(x, y);
 };
 
-export const showPostureFloating = (preloadPath: string): void => {
+export const showPostureFloating = (preloadPath: string, opacity = DEFAULT_OPACITY): void => {
+  currentOpacity = opacity;
+
   if (floatingWindow && !floatingWindow.isDestroyed()) {
+    setPostureFloatingOpacity(opacity);
     floatingWindow.showInactive();
     return;
   }
@@ -207,7 +221,7 @@ export const showPostureFloating = (preloadPath: string): void => {
   });
 
   void window
-    .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildHtml())}`)
+    .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildHtml(currentOpacity))}`)
     .then(() => {
       if (!window.isDestroyed()) {
         window.showInactive();
@@ -239,6 +253,14 @@ export const updatePostureFloating = (payload: FloatingState): void => {
 
 export const isPostureFloatingVisible = (): boolean =>
   Boolean(floatingWindow && !floatingWindow.isDestroyed() && floatingWindow.isVisible());
+
+export const setPostureFloatingOpacity = (opacity: number): void => {
+  currentOpacity = opacity;
+  if (!floatingWindow || floatingWindow.isDestroyed()) return;
+  floatingWindow.webContents
+    .executeJavaScript(`window.__setFloatingOpacity && window.__setFloatingOpacity(${opacity})`)
+    .catch(() => undefined);
+};
 
 export const openFloatingMenu = (
   options: { onRestore: () => void; onQuit: () => void },

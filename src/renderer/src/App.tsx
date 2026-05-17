@@ -2,8 +2,10 @@ import { type ReactElement, useCallback, useEffect, useRef, useState } from 'rea
 import {
   Activity,
   ArrowLeft,
+  CalendarClock,
   Clock,
   History,
+  Maximize2,
   Minus,
   Pause,
   PictureInPicture2,
@@ -20,7 +22,9 @@ import { PostureCheck } from './components/PostureCheck';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimelineView } from './components/TimelineView';
 import { clearSession, loadSession, saveSession } from './lib/session/storage';
+import { formatScheduleSummary } from './lib/settings/formatScheduleSummary';
 import { isWithinSchedule } from './lib/settings/schedule';
+import { decideScheduleAutoStart } from './lib/settings/scheduleAutoStart';
 import { useSettings } from './lib/settings/useSettings';
 import { hydrateTimeline } from './lib/timeline/storage';
 
@@ -144,17 +148,23 @@ export const App = (): ReactElement => {
     startCheck();
   }, [settings.onboardingCompleted, settings.autoStartMode, startCheck]);
 
+  const wasWithinScheduleRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (!settings.onboardingCompleted) return;
-    if (settings.autoStartMode !== 'schedule') return;
+    if (settings.autoStartMode !== 'schedule') {
+      wasWithinScheduleRef.current = null;
+      return;
+    }
 
     const evaluate = (): void => {
       const inside = isWithinSchedule(settings.schedule);
-      if (inside && !checkActive) {
-        startCheck();
-      } else if (!inside && checkActive) {
-        stopCheck();
-      }
+      const decision = decideScheduleAutoStart({
+        isWithinWindow: inside,
+        wasWithinWindow: wasWithinScheduleRef.current,
+        isCheckActive: checkActive,
+      });
+      wasWithinScheduleRef.current = inside;
+      if (decision === 'start') startCheck();
     };
 
     evaluate();
@@ -166,7 +176,6 @@ export const App = (): ReactElement => {
     settings.schedule,
     checkActive,
     startCheck,
-    stopCheck,
   ]);
 
   useEffect(() => {
@@ -182,6 +191,13 @@ export const App = (): ReactElement => {
   useEffect(() => {
     window.postureApp?.setAnalysisActive?.(checkActive);
   }, [checkActive]);
+
+  useEffect(() => {
+    window.postureApp?.setFocusConfig?.({
+      enabled: settings.floatingWindow,
+      opacity: settings.floatingOpacity,
+    });
+  }, [settings.floatingWindow, settings.floatingOpacity]);
 
   useEffect(() => {
     if (!checkActive) return;
@@ -215,14 +231,33 @@ export const App = (): ReactElement => {
   if (miniView !== 'off' && checkActive && !isPaused) {
     return (
       <div className="mini-shell" data-mini-view={miniView}>
-        <PostureCheck
-          settings={settings}
-          onStop={pauseCheck}
-          onSettingsChange={update}
-          miniView={miniView}
-          onChangeMiniView={setMiniView}
-          onExitMini={exitMini}
-        />
+        <header className="mini-shell__chrome">
+          <span className="mini-shell__drag" aria-hidden="true">
+            Postura Trabalho, janela compacta
+          </span>
+          <div className="mini-shell__chrome-actions">
+            <button
+              type="button"
+              className="mini-shell__restore"
+              aria-label="Restaurar janela ao tamanho normal"
+              title="Restaurar janela ao tamanho normal"
+              onClick={exitMini}
+            >
+              <PictureInPicture2 size={16} aria-hidden="true" />
+            </button>
+            <WindowControls />
+          </div>
+        </header>
+        <div className="mini-shell__body">
+          <PostureCheck
+            settings={settings}
+            onStop={pauseCheck}
+            onSettingsChange={update}
+            miniView={miniView}
+            onChangeMiniView={setMiniView}
+            onExitMini={exitMini}
+          />
+        </div>
       </div>
     );
   }
@@ -252,8 +287,8 @@ export const App = (): ReactElement => {
               }
               title={
                 isPaused
-                  ? `Análise pausada em ${formatElapsed(elapsedMs)} — clique para retomar`
-                  : `Analisando postura há ${formatElapsed(elapsedMs)} — clique para voltar à câmera`
+                  ? `Análise pausada em ${formatElapsed(elapsedMs)}. Clique para retomar.`
+                  : `Analisando postura há ${formatElapsed(elapsedMs)}. Clique para voltar à câmera.`
               }
               onClick={() => (isPaused ? setView('idle') : setView('active'))}
             >
@@ -268,8 +303,8 @@ export const App = (): ReactElement => {
             <button
               className="icon-button"
               type="button"
-              aria-label="Câmera compacta no canto"
-              title="Câmera compacta no canto"
+              aria-label="Modo janela compacta"
+              title="Encolhe a janela e posiciona no canto inferior direito da tela onde o cursor está"
               onClick={() => enterMini('full')}
             >
               <PictureInPicture2 size={20} aria-hidden="true" />
@@ -353,7 +388,14 @@ export const App = (): ReactElement => {
               />
             )
           ) : (
-            <IdlePanel onStart={startCheck} />
+            <IdlePanel
+              onStart={startCheck}
+              scheduleSummary={
+                settings.autoStartMode === 'schedule'
+                  ? formatScheduleSummary(settings.schedule)
+                  : null
+              }
+            />
           )
         ) : null}
       </main>
@@ -361,7 +403,13 @@ export const App = (): ReactElement => {
   );
 };
 
-const IdlePanel = ({ onStart }: { onStart: () => void }): ReactElement => (
+const IdlePanel = ({
+  onStart,
+  scheduleSummary,
+}: {
+  onStart: () => void;
+  scheduleSummary: string | null;
+}): ReactElement => (
   <section className="idle-card">
     <header className="idle-card__header">
       <h2 className="idle-card__title">Pronto para iniciar</h2>
@@ -370,22 +418,30 @@ const IdlePanel = ({ onStart }: { onStart: () => void }): ReactElement => (
       </p>
     </header>
 
-    <button className="button button--filled idle-card__cta" type="button" onClick={onStart}>
-      <Play size={18} aria-hidden="true" />
-      Ativar check de postura
-    </button>
+    <div className="idle-card__cta-stack">
+      <button className="button button--filled idle-card__cta" type="button" onClick={onStart}>
+        <Play size={18} aria-hidden="true" />
+        Ativar check de postura
+      </button>
+      {scheduleSummary ? (
+        <p className="idle-card__schedule-hint" aria-live="polite">
+          <CalendarClock size={13} aria-hidden="true" />
+          <span>Inicia automático {scheduleSummary}</span>
+        </p>
+      ) : null}
+    </div>
 
     <ul className="idle-card__features" role="list">
       <li className="feature-item">
-        <Shield size={16} strokeWidth={2} aria-hidden="true" />
+        <Shield size={16} aria-hidden="true" />
         <span>Processado localmente</span>
       </li>
       <li className="feature-item">
-        <Clock size={16} strokeWidth={2} aria-hidden="true" />
+        <Clock size={16} aria-hidden="true" />
         <span>Calibragem rápida</span>
       </li>
       <li className="feature-item">
-        <Activity size={16} strokeWidth={2} aria-hidden="true" />
+        <Activity size={16} aria-hidden="true" />
         <span>Alertas em tempo real</span>
       </li>
     </ul>
@@ -408,7 +464,7 @@ const WindowControls = (): ReactElement => (
       aria-label="Minimizar"
       onClick={() => window.postureApp?.window?.minimize()}
     >
-      <Minus size={14} aria-hidden="true" />
+      <Minus size={16} aria-hidden="true" />
     </button>
     <button
       type="button"
@@ -416,7 +472,7 @@ const WindowControls = (): ReactElement => (
       aria-label="Maximizar / Restaurar"
       onClick={() => window.postureApp?.window?.toggleMaximize()}
     >
-      <Square size={12} aria-hidden="true" />
+      <Square size={14} aria-hidden="true" />
     </button>
     <button
       type="button"
@@ -424,7 +480,7 @@ const WindowControls = (): ReactElement => (
       aria-label="Fechar"
       onClick={closeAppWindow}
     >
-      <X size={14} aria-hidden="true" />
+      <X size={16} aria-hidden="true" />
     </button>
   </div>
 );

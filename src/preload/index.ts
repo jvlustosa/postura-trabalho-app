@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('postureApp', {
   setAnalysisActive: (active: boolean): void => {
     ipcRenderer.send('posture-floating:set-active', active);
   },
+  setFocusConfig: (config: { enabled: boolean; opacity: number }): void => {
+    ipcRenderer.send('posture-floating:set-config', config);
+  },
   restoreFromFloating: (): void => {
     ipcRenderer.send('posture-floating:restore');
   },

@@ -7,15 +7,6 @@
 
   const init = () => {
     renderLucide();
-
-    document.querySelectorAll('[data-checkout]').forEach((el) => {
-      el.addEventListener('click', (e) => {
-        if (el.getAttribute('href') === '#') {
-          e.preventDefault();
-          alert('Checkout em breve. Por enquanto, escreva pra contato@posturatrabalho.com.');
-        }
-      });
-    });
   };
 
   const start = () => {

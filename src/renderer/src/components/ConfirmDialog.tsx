@@ -61,7 +61,7 @@ export const ConfirmDialog = ({
         aria-describedby="confirm-dialog-message"
       >
         <div className={`confirm-dialog__icon${destructive ? ' confirm-dialog__icon--danger' : ''}`}>
-          <AlertTriangle size={24} aria-hidden="true" />
+          <AlertTriangle size={28} aria-hidden="true" />
         </div>
         <h2 id="confirm-dialog-title" className="confirm-dialog__title">
           {title}

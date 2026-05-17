@@ -127,7 +127,7 @@ describe('analyzePosture', () => {
   });
 
   it('flags slouch as warning via composite hunch when axes drop subtly', () => {
-    // Shoulders narrow ~4%, torso collapses ~5%, head drops ~5% — each below
+    // Shoulders narrow ~4%, torso collapses ~5%, head drops ~5%; each below
     // its individual warning threshold; together they indicate a hunched back.
     const landmarks = baseLandmarks().map((l) => {
       if (l.name === 'leftShoulder') return { ...l, x: 0.3945 };

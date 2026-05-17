@@ -1,4 +1,4 @@
-# Landing — Postura Trabalho
+# Landing: Postura Trabalho
 
 Landing page estática para divulgação do app desktop. Mesmo design (Material 3) do app, com detecção automática de SO e links para os releases do GitHub.
 
@@ -6,7 +6,7 @@ Landing page estática para divulgação do app desktop. Mesmo design (Material 
 
 A pasta `landing/` é um site estático puro (HTML + CSS + JS). Não precisa de build.
 
-### Opção 1 — CLI
+### Opção 1: CLI
 
 ```bash
 cd landing
@@ -15,7 +15,7 @@ npx vercel
 npx vercel --prod
 ```
 
-### Opção 2 — Importar via Dashboard
+### Opção 2: Importar via Dashboard
 
 1. Acesse https://vercel.com/new
 2. Importe o repositório `jvlustosa/postura-trabalho`

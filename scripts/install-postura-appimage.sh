@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Instala o AppImage em ~/Applications/postura-trabalho.AppImage e registra no menu.
-# Se o app estiver aberto, sobrescrever o mesmo caminho com "cp" quebra (ETXTBSY) — copiamos para .new e fazemos "mv".
+# Se o app estiver aberto, sobrescrever o mesmo caminho com "cp" quebra (ETXTBSY); copiamos para .new e fazemos "mv".
 
 set -euo pipefail
 
@@ -43,10 +43,10 @@ if [[ -f "$SRC" ]]; then
     STALE="${DEST}.was-running.$$"
     mv "$DEST" "$STALE"
     mv "$TMP" "$DEST"
-    echo "Instalado. Versão em uso foi renomeada para $STALE — feche o app e apague esse arquivo depois." >&2
+    echo "Instalado. Versão em uso foi renomeada para $STALE. Feche o app e apague esse arquivo depois." >&2
   fi
 else
-  echo "Aviso: AppImage não encontrado em $SRC — só ícone e atalho foram atualizados." >&2
+  echo "Aviso: AppImage não encontrado em $SRC; só ícone e atalho foram atualizados." >&2
   echo "Gere com: npm run postura:dist" >&2
 fi
 
@@ -67,4 +67,4 @@ EOF
 
 chmod 644 "$DESKTOP"
 update-desktop-database "$APP_DIR" 2>/dev/null || true
-echo "OK: $DEST — busque por \"postura\" no menu."
+echo "OK: $DEST. Busque por \"postura\" no menu."

@@ -74,7 +74,7 @@ export async function buildCameraDiagnosticReport(
   options: CameraDiagnosticOptions,
 ): Promise<string> {
   const lines: string[] = [];
-  lines.push('Postura Trabalho — log detalhado (câmera / mídia)');
+  lines.push('Postura Trabalho: log detalhado (câmera / mídia)');
   lines.push(`timestamp_iso: ${new Date().toISOString()}`);
   lines.push(`surface: ${options.surface}`);
   if (options.uiMessage) lines.push(`mensagem_ui: ${options.uiMessage}`);
@@ -90,7 +90,7 @@ export async function buildCameraDiagnosticReport(
       lines.push(error.stack);
     }
   } else {
-    lines.push('(nenhum objeto Error capturado — ex.: falha lógica ou fluxo sem exceção)');
+    lines.push('(nenhum objeto Error capturado; ex.: falha lógica ou fluxo sem exceção)');
   }
 
   lines.push('--- ambiente ---');
@@ -124,7 +124,7 @@ export async function buildCameraDiagnosticReport(
   await appendEnumerateDevices(lines);
 
   lines.push('');
-  lines.push('(Labels de dispositivo podem vir vazias até a câmera ser autorizada — isso é esperado no Chromium.)');
+  lines.push('(Labels de dispositivo podem vir vazias até a câmera ser autorizada; isso é esperado no Chromium.)');
 
   return lines.join('\n');
 }

@@ -4,6 +4,7 @@ import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
 import type { MiniView } from '../App';
 import { type AlertLevel, createPostureWatcher } from '../lib/alerts/createPostureWatcher';
+import { playAlertTone } from '../lib/alerts/playAlertTone';
 import { buildCameraDiagnosticReport } from '../lib/media/buildCameraDiagnosticReport';
 import { classifyMediaError, formatMediaErrorDetails } from '../lib/media/classifyMediaError';
 import { createPoseLandmarker } from '../lib/pose/createPoseLandmarker';
@@ -168,32 +169,6 @@ export const PostureCheck = ({
   const alertsEnabledRef = useRef(settings.alertsEnabled);
   const alertThresholdMsRef = useRef(settings.alertThresholdSeconds * 1_000);
   const alertSoundRef = useRef(settings.alertSound);
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  const playAlertTone = useCallback((level: AlertLevel): void => {
-    if (typeof window === 'undefined') return;
-    const Ctor =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    try {
-      audioContextRef.current ??= new Ctor();
-      const ctx = audioContextRef.current;
-      if (ctx.state === 'suspended') void ctx.resume();
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(level === 'bad' ? 660 : 880, now);
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.4);
-    } catch {
-      // audio playback may fail without user gesture; ignore
-    }
-  }, []);
 
   const smoother = useMemo(() => createPostureSmoother(8), []);
   const landmarkSmoother = useMemo(() => createLandmarkSmoother(0.4), []);
@@ -214,7 +189,7 @@ export const PostureCheck = ({
           window.postureApp?.hideAlert();
         },
       }),
-    [playAlertTone],
+    [],
   );
 
   const streakStartRef = useRef<number | null>(null);
@@ -300,14 +275,6 @@ export const PostureCheck = ({
   useEffect(() => {
     alertSoundRef.current = settings.alertSound;
   }, [settings.alertSound]);
-
-  useEffect(
-    () => () => {
-      audioContextRef.current?.close().catch(() => undefined);
-      audioContextRef.current = null;
-    },
-    [],
-  );
 
   // Restore saved calibration on mount (only if baselines are present)
   useEffect(() => {
@@ -758,8 +725,8 @@ export const PostureCheck = ({
           <button
             className="icon-button"
             type="button"
-            aria-label="Câmera compacta no canto"
-            title="Câmera compacta no canto"
+            aria-label="Modo janela compacta"
+            title="Encolhe a janela e posiciona no canto inferior direito da tela onde o cursor está"
             onClick={() => onChangeMiniView?.('full')}
           >
             <PictureInPicture2 size={20} aria-hidden="true" />
@@ -855,7 +822,7 @@ export const PostureCheck = ({
             ) : null}
             {copyDiagFeedback === 'failed' ? (
               <span className="error-note__feedback" aria-live="polite">
-                Não foi possível copiar — selecione e copie os detalhes abaixo
+                Não foi possível copiar. Selecione e copie os detalhes abaixo.
               </span>
             ) : null}
           </div>

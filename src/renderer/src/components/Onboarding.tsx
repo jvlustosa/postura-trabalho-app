@@ -148,7 +148,7 @@ interface SensitivityStepProps {
 const SensitivityStep = ({ value, onChange }: SensitivityStepProps): ReactElement => (
   <div className="onboarding-m__step">
     <h2 className="onboarding-m__title">Quão alerta?</h2>
-    <p className="onboarding-m__copy">Escolha agora — dá pra mudar nas configurações.</p>
+    <p className="onboarding-m__copy">Escolha agora. Dá para mudar nas configurações.</p>
     <div className="option-list" role="radiogroup" aria-label="Sensibilidade dos avisos">
       {sensitivityOptions.map((option) => {
         const isSelected = option.value === value;
@@ -188,7 +188,7 @@ const CalibrateStep = ({
     <h2 className="onboarding-m__title">Calibragem inicial</h2>
     <p className="onboarding-m__copy">
       Vamos medir sua postura ereta por {durationSeconds}s para personalizar a detecção.
-      Sente-se reto e olhe para a tela — os dados ficam só neste dispositivo.
+      Sente-se reto e olhe para a tela. Os dados ficam só neste dispositivo.
     </p>
     <CalibrationStep
       durationSeconds={durationSeconds}

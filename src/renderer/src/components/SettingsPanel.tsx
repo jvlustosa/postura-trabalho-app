@@ -4,10 +4,11 @@ import {
   type ReactNode,
   type SVGProps,
 } from 'react';
-import { Activity, Bell, Camera, CalendarClock, Focus, Settings2 } from 'lucide-react';
+import { Activity, Bell, Camera, CalendarClock, Clock, Focus, Settings2 } from 'lucide-react';
 
 import { ScreenHeightPicker } from './ScreenHeightPicker';
 import { useConfirm } from './ConfirmDialog';
+import { playAlertTone } from '../lib/alerts/playAlertTone';
 import type {
   AlertThresholdSeconds,
   AppSettings,
@@ -243,7 +244,10 @@ export const SettingsPanel = ({
           label="Som de aviso"
           hint="Toca um bip discreto quando o alerta dispara."
           value={settings.alertSound}
-          onChange={(value) => onChange({ alertSound: value })}
+          onChange={(value) => {
+            onChange({ alertSound: value });
+            if (value) playAlertTone('bad');
+          }}
           disabled={!settings.alertsEnabled}
         />
       </SettingsSection>
@@ -325,26 +329,36 @@ export const SettingsPanel = ({
           <div className="time-range">
             <label className="time-field">
               <span className="time-field__label">Início</span>
-              <input
-                type="time"
-                className="time-field__input"
-                value={settings.schedule.startTime}
-                disabled={!scheduleActive}
-                onChange={(event) => updateScheduleTime('startTime', event.target.value)}
-              />
+              <div className="time-field__control">
+                <Clock className="time-field__icon" aria-hidden="true" />
+                <input
+                  type="time"
+                  lang="pt-BR"
+                  step={60}
+                  className="time-field__input"
+                  value={settings.schedule.startTime}
+                  disabled={!scheduleActive}
+                  onChange={(event) => updateScheduleTime('startTime', event.target.value)}
+                />
+              </div>
             </label>
             <span className="time-range__separator" aria-hidden="true">
               até
             </span>
             <label className="time-field">
               <span className="time-field__label">Fim</span>
-              <input
-                type="time"
-                className="time-field__input"
-                value={settings.schedule.endTime}
-                disabled={!scheduleActive}
-                onChange={(event) => updateScheduleTime('endTime', event.target.value)}
-              />
+              <div className="time-field__control">
+                <Clock className="time-field__icon" aria-hidden="true" />
+                <input
+                  type="time"
+                  lang="pt-BR"
+                  step={60}
+                  className="time-field__input"
+                  value={settings.schedule.endTime}
+                  disabled={!scheduleActive}
+                  onChange={(event) => updateScheduleTime('endTime', event.target.value)}
+                />
+              </div>
             </label>
           </div>
         </div>
@@ -364,6 +378,50 @@ export const SettingsPanel = ({
           value={settings.showOverlay}
           onChange={(value) => onChange({ showOverlay: value })}
         />
+      </SettingsSection>
+
+      <SettingsSection
+        icon={Focus}
+        title="Modo foco"
+        hint="Como o app some da sua tela enquanto você trabalha."
+      >
+        <ToggleRow
+          label="Pill flutuante ao fechar a janela"
+          hint="Ao fechar, a janela some e fica só uma pill discreta no canto com seu status. Sem isso, fechar encerra o app."
+          value={settings.floatingWindow}
+          onChange={(value) => onChange({ floatingWindow: value })}
+        />
+
+        <div
+          className={`settings-group${settings.floatingWindow ? '' : ' settings-group--disabled'}`}
+          role="group"
+          aria-label="Opacidade da pill"
+        >
+          <div className="settings-group__head">
+            <span className="settings-group__label">Opacidade da pill</span>
+            <span className="settings-group__hint">
+              Quanto mais transparente, menos a pill chama atenção.
+            </span>
+          </div>
+          <div className="segmented" role="radiogroup">
+            {[0.6, 0.75, 0.85, 1].map((value) => {
+              const isSelected = Math.abs(settings.floatingOpacity - value) < 0.01;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  disabled={!settings.floatingWindow}
+                  className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
+                  onClick={() => onChange({ floatingOpacity: value })}
+                >
+                  {Math.round(value * 100)}%
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </SettingsSection>
 
       <SettingsSection icon={Settings2} title="Aplicativo" hint="Comportamento geral.">
@@ -423,7 +481,7 @@ const formatCalibratedAt = (iso: string): string => {
   const date = new Date(iso);
 
   if (Number.isNaN(date.getTime())) {
-    return '—';
+    return '-';
   }
 
   return new Intl.DateTimeFormat('pt-BR', {

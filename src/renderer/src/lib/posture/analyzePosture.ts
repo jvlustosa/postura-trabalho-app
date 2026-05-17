@@ -123,7 +123,7 @@ export const analyzePosture = (
     severity = Math.max(severity, neckTilt >= thresholds.neckBad ? 2 : 1);
   }
 
-  // Slouch via shoulder narrowing (works without hips — primary detection)
+  // Slouch via shoulder narrowing (works without hips; primary detection)
   const hasWidthBaseline = thresholds.shoulderWidthBaseline > 0 && shoulderWidth > 0;
   const widthDeficit = hasWidthBaseline
     ? Math.max(0, 1 - shoulderWidth / thresholds.shoulderWidthBaseline)

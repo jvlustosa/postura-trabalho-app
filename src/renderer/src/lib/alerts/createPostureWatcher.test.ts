@@ -139,7 +139,7 @@ describe('createPostureWatcher', () => {
 
     watcher.observe('bad', ['head-forward'], 0);
     watcher.observe('bad', ['head-forward'], 4_000);
-    // brief good frames — under the hysteresis window, so badSince must survive
+    // brief good frames; under the hysteresis window, so badSince must survive
     watcher.observe('good', [], 4_500);
     watcher.observe('good', [], 5_200);
     watcher.observe('bad', ['head-forward'], 5_500);

@@ -27,6 +27,7 @@ interface Window {
     exitMini?: () => void;
     updateFloating?: (payload: PostureFloatingPayload) => void;
     setAnalysisActive?: (active: boolean) => void;
+    setFocusConfig?: (config: { enabled: boolean; opacity: number }) => void;
     restoreFromFloating?: () => void;
     showFloating?: () => void;
     openFloatingMenu?: () => void;

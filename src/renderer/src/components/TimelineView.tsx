@@ -86,7 +86,11 @@ const SparklineChart = ({ points, range }: SparklineChartProps): ReactElement =>
 
   const areaPoints = `0,${height} ${linePoints} ${width},${height}`;
 
-  const labelStep = Math.max(1, Math.ceil(n / 6));
+  const desiredLabels = range === '24h' ? 5 : 6;
+  const labelIndices = Array.from({ length: desiredLabels }, (_, k) =>
+    Math.round((k / (desiredLabels - 1)) * (n - 1)),
+  );
+  const labelSet = new Set(labelIndices);
 
   return (
     <div className="sparkline" role="img" aria-label="Tendência de postura ok ao longo do tempo">
@@ -116,9 +120,15 @@ const SparklineChart = ({ points, range }: SparklineChartProps): ReactElement =>
       </svg>
       <div className="sparkline__axis" aria-hidden="true">
         {points.map((p, i) => {
-          if (i % labelStep !== 0 && i !== n - 1) return null;
+          if (!labelSet.has(i)) return null;
+          const ratio = n === 1 ? 0.5 : i / (n - 1);
+          const align = ratio < 0.04 ? 'start' : ratio > 0.96 ? 'end' : 'center';
           return (
-            <span key={p.bucketStart} className="sparkline__tick">
+            <span
+              key={p.bucketStart}
+              className={`sparkline__tick sparkline__tick--${align}`}
+              style={{ left: `${ratio * 100}%` }}
+            >
               {formatBucketLabel(range, p.bucketStart)}
             </span>
           );
@@ -220,7 +230,7 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
           <div className="streak-card__content">
             <span className="streak-card__label">Recorde de postura</span>
             <span className="streak-card__value">
-              {bestStreak > 0 ? formatDuration(bestStreak) : '—'}
+              {bestStreak > 0 ? formatDuration(bestStreak) : '-'}
             </span>
           </div>
         </div>
@@ -231,7 +241,7 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
           <div className="streak-card__content">
             <span className="streak-card__label">Streak atual</span>
             <span className="streak-card__value">
-              {currentStreak > 0 ? formatDuration(currentStreak) : '—'}
+              {currentStreak > 0 ? formatDuration(currentStreak) : '-'}
             </span>
           </div>
         </div>
@@ -294,7 +304,7 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
               </svg>
               <div className="donut-chart__center">
                 <span className="donut-chart__value">{formatPercent(pct(totals.good))}</span>
-                <span className="donut-chart__caption">Postura ok</span>
+                <span className="donut-chart__caption">do tempo</span>
               </div>
             </div>
 

@@ -10,6 +10,7 @@ import {
   hidePostureFloating,
   isPostureFloatingVisible,
   openFloatingMenu,
+  setPostureFloatingOpacity,
   showPostureFloating,
   updatePostureFloating,
 } from './postureFloatingWindow';
@@ -50,6 +51,8 @@ let mainWindow: BrowserWindow | null = null;
 let miniSnapshot: MiniSnapshot | null = null;
 let isQuitting = false;
 let analysisActive = false;
+let floatingEnabled = true;
+let floatingOpacity = 0.85;
 let lastFloatingState: FloatingState = { state: 'inactive', label: 'Inativo', score: 0 };
 /** True after electron-updater fetched a build; Ctrl/Cmd+Shift+R then restarts into the new version. */
 let updateDownloaded = false;
@@ -71,6 +74,21 @@ const attachHardReloadShortcut = (window: BrowserWindow): void => {
   });
 };
 
+const applyMiniLayout = (window: BrowserWindow): void => {
+  if (window.isDestroyed() || !miniSnapshot) return;
+
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { workArea } = display;
+  const x = Math.round(workArea.x + workArea.width - MINI_WIDTH - MINI_MARGIN);
+  const y = Math.round(workArea.y + workArea.height - MINI_HEIGHT - MINI_MARGIN);
+
+  window.setMinimumSize(220, 160);
+  window.setResizable(true);
+  window.setAlwaysOnTop(true, 'screen-saver');
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  window.setBounds({ x, y, width: MINI_WIDTH, height: MINI_HEIGHT }, true);
+};
+
 const enterMiniMode = (): void => {
   const window = mainWindow;
   if (!window || window.isDestroyed() || miniSnapshot) return;
@@ -83,16 +101,19 @@ const enterMiniMode = (): void => {
     hadFrame: true,
   };
 
-  const display = screen.getDisplayMatching(window.getBounds());
-  const { workArea } = display;
-  const x = workArea.x + workArea.width - MINI_WIDTH - MINI_MARGIN;
-  const y = workArea.y + workArea.height - MINI_HEIGHT - MINI_MARGIN;
+  const needDeferredLayout = window.isMaximized() || window.isFullScreen();
+  if (window.isMaximized()) {
+    window.unmaximize();
+  }
+  if (window.isFullScreen()) {
+    window.setFullScreen(false);
+  }
 
-  window.setMinimumSize(220, 160);
-  window.setResizable(true);
-  window.setAlwaysOnTop(true, 'screen-saver');
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  window.setBounds({ x, y, width: MINI_WIDTH, height: MINI_HEIGHT }, true);
+  if (needDeferredLayout) {
+    setTimeout(() => applyMiniLayout(window), 120);
+  } else {
+    applyMiniLayout(window);
+  }
 };
 
 const exitMiniMode = (): void => {
@@ -124,7 +145,7 @@ const sendToBackground = (): void => {
   if (miniSnapshot) exitMiniMode();
   hidePostureAlert();
   if (window.isVisible()) window.hide();
-  showPostureFloating(PRELOAD_PATH);
+  showPostureFloating(PRELOAD_PATH, floatingOpacity);
   updatePostureFloating(lastFloatingState);
 };
 
@@ -173,6 +194,10 @@ const createWindow = (): void => {
 
   window.on('close', (event) => {
     if (isQuitting) return;
+    if (!floatingEnabled) {
+      quitApp();
+      return;
+    }
     event.preventDefault();
     sendToBackground();
   });
@@ -211,7 +236,7 @@ const showNativeNotification = (level: AlertLevel, message: string): void => {
     notification.on('click', () => restoreMainWindow());
     notification.show();
   } catch {
-    // older Linux desktops may throw — fail silently
+    // older Linux desktops may throw; fail silently
   }
 };
 
@@ -270,6 +295,18 @@ const registerIpcHandlers = (): void => {
     analysisActive = Boolean(active);
     if (!analysisActive && isPostureFloatingVisible()) {
       hidePostureFloating();
+    }
+  });
+
+  ipcMain.on('posture-floating:set-config', (_event, payload: unknown) => {
+    if (typeof payload !== 'object' || payload === null) return;
+    const { enabled, opacity } = payload as { enabled?: unknown; opacity?: unknown };
+    if (typeof enabled === 'boolean') {
+      floatingEnabled = enabled;
+    }
+    if (typeof opacity === 'number' && Number.isFinite(opacity)) {
+      floatingOpacity = Math.min(1, Math.max(0.3, opacity));
+      setPostureFloatingOpacity(floatingOpacity);
     }
   });
 

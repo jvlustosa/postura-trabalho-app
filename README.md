@@ -22,16 +22,16 @@ Baixe a versão mais recente na página de [Releases](../../releases):
 
 ## Scripts
 
-- `npm run dev` — abre o app em desenvolvimento
-- `npm test` — roda testes unitários
-- `npm run lint` — roda ESLint
-- `npm run build` — copia assets locais da MediaPipe, valida TypeScript e gera `out`
-- `npm run postura:dist` — gera AppImage (Linux)
-- `npm run postura:dist:deb` — gera AppImage e `.deb` (Linux)
-- `npm run postura:install` — copia o AppImage para `~/Applications` e registra no menu
-- `npm run postura:reinstall` — build + instalação local (atalho: `npm run reinstall`)
-- `npm run dist:win` — gera NSIS e portable para Windows
-- `npm run dist:mac` — gera DMG e zip para macOS (Intel + Apple Silicon)
+- `npm run dev`: abre o app em desenvolvimento
+- `npm test`: roda testes unitários
+- `npm run lint`: roda ESLint
+- `npm run build`: copia assets locais da MediaPipe, valida TypeScript e gera `out`
+- `npm run postura:dist`: gera AppImage (Linux)
+- `npm run postura:dist:deb`: gera AppImage e `.deb` (Linux)
+- `npm run postura:install`: copia o AppImage para `~/Applications` e registra no menu
+- `npm run postura:reinstall`: build + instalação local (atalho: `npm run reinstall`)
+- `npm run dist:win`: gera NSIS e portable para Windows
+- `npm run dist:mac`: gera DMG e zip para macOS (Intel + Apple Silicon)
 
 ## Releasing
 
@@ -50,6 +50,6 @@ O GitHub Actions builda para Linux, Windows e macOS (Intel + Apple Silicon) e pu
 - Os arquivos WASM são copiados de `@mediapipe/tasks-vision` para `public/mediapipe/wasm`.
 - Em Linux, o target `.deb` do `electron-builder` depende de `libcrypt.so.1` no host.
 - Em Linux, builds Windows com NSIS/portable dependem de `wine`.
-- Builds macOS (`dist:mac`) **só funcionam no próprio macOS** — o CI usa `macos-latest`. Não tente cross-compilar do Linux.
+- Builds macOS (`dist:mac`) **só funcionam no próprio macOS**; o CI usa `macos-latest`. Não tente cross-compilar do Linux.
 - O ícone `build/icon.png` (1024×1024) é convertido em `.icns` automaticamente no host macOS pelo electron-builder.
 - O app verifica atualizações automaticamente ao iniciar (via `electron-updater`).

@@ -225,12 +225,14 @@ p {
 }
 
 .app-bar__brand {
-  flex: 1;
-  display: flex;
+  flex: 0 0 auto;
+  width: fit-content;
+  display: inline-flex;
   align-items: center;
   gap: 12px;
   padding: 6px 10px;
   margin-left: -10px;
+  margin-right: auto;
   background: transparent;
   border: none;
   border-radius: 12px;
@@ -582,6 +584,28 @@ p {
   min-height: 48px;
   padding: 0 28px;
   font-size: 0.9375rem;
+}
+
+.idle-card__cta-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.idle-card__schedule-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.78;
+}
+
+.idle-card__schedule-hint svg {
+  color: var(--md-sys-color-primary);
+  opacity: 0.85;
 }
 
 .idle-card__row {
@@ -1631,25 +1655,81 @@ p {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.time-field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.time-field__icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+}
+
 .time-field__input {
-  height: 40px;
-  padding: 0 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 38px;
   border-radius: var(--md-shape-md);
   border: 1px solid var(--md-sys-color-outline);
-  background: transparent;
+  background: var(--md-sys-color-surface-container-low);
   color: var(--md-sys-color-on-surface);
   font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
   font-family: inherit;
+  letter-spacing: 0.02em;
+  transition:
+    border-color 150ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.time-field__input:hover:not(:disabled) {
+  border-color: var(--md-sys-color-on-surface);
 }
 
 .time-field__input:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 0;
-  border-color: transparent;
+  outline: none;
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 1px var(--md-sys-color-primary);
 }
 
 .time-field__input:disabled {
   cursor: default;
+  background: transparent;
+}
+
+.time-field__control:has(.time-field__input:disabled) .time-field__icon {
+  opacity: 0.55;
+}
+
+.time-field__input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.time-field__input:disabled::-webkit-calendar-picker-indicator {
+  cursor: default;
+}
+
+.time-field__input::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.time-field__input::-webkit-datetime-edit-ampm-field {
+  display: none;
 }
 
 .settings-group__head {
@@ -2055,6 +2135,8 @@ p {
   flex-direction: column;
   gap: 24px;
   padding: 28px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .timeline-card__header {
@@ -2122,15 +2204,14 @@ p {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff7a18, #ffb347);
-  color: #ffffff;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
   flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(255, 122, 24, 0.25);
 }
 
 .streak-card__icon--current {
-  background: linear-gradient(135deg, var(--md-sys-color-primary), #4cdada);
-  box-shadow: 0 4px 10px rgba(0, 106, 106, 0.25);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
 }
 
 .streak-card__content {
@@ -2158,11 +2239,11 @@ p {
 .sparkline-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   border-radius: var(--md-shape-md);
   background: var(--md-sys-color-surface-container-low);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  min-width: 0;
 }
 
 .sparkline-section__header {
@@ -2170,6 +2251,7 @@ p {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .sparkline-section__title {
@@ -2177,6 +2259,9 @@ p {
   font-weight: 600;
   color: var(--md-sys-color-on-surface);
   letter-spacing: -0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sparkline-section__hint {
@@ -2189,7 +2274,8 @@ p {
 .sparkline {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .sparkline--empty {
@@ -2228,21 +2314,32 @@ p {
 }
 
 .sparkline__axis {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 16px;
   font-size: 0.6875rem;
   color: var(--md-sys-color-on-surface-variant);
   font-variant-numeric: tabular-nums;
-  padding: 0 2px;
 }
 
 .sparkline__tick {
+  position: absolute;
+  top: 0;
   white-space: nowrap;
+  transform: translateX(-50%);
+  line-height: 1.2;
+}
+
+.sparkline__tick--start {
+  transform: translateX(0);
+}
+
+.sparkline__tick--end {
+  transform: translateX(-100%);
 }
 
 .timeline-summary {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 28px;
 }
@@ -2254,7 +2351,7 @@ p {
   }
 
   .timeline-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     gap: 20px;
   }
@@ -2332,13 +2429,15 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .timeline-stats__row {
   display: grid;
-  grid-template-columns: 10px 1fr auto auto;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .timeline-stats__dot {
@@ -2363,6 +2462,9 @@ p {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .timeline-stats__value {
@@ -2451,16 +2553,90 @@ p {
 /* ---------- Mini floating mode ---------- */
 
 .mini-shell {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  background: transparent;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--md-sys-color-surface, #0b0d12);
   overflow: hidden;
 }
 
-.mini-panel {
+.mini-shell__chrome {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container, #12141c);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.mini-shell__drag {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--md-sys-color-on-surface-variant, rgba(255, 255, 255, 0.55));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-shell__chrome .window-controls,
+.mini-shell__chrome-actions,
+.mini-shell__restore {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.mini-shell__chrome-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.mini-shell__restore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  margin-right: 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.mini-shell__restore:hover {
+  background: var(--md-sys-color-surface-container-high, rgba(255, 255, 255, 0.08));
+  color: var(--md-sys-color-on-surface, #f7fafa);
+}
+
+.mini-shell__chrome .window-controls {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.mini-shell__body {
+  flex: 1;
+  min-height: 0;
   position: relative;
+}
+
+.mini-panel {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -2553,7 +2729,7 @@ p {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 3;
-  opacity: 0;
+  opacity: 0.9;
   transition: opacity 180ms ease;
 }
 
