@@ -555,6 +555,14 @@ p {
   color: var(--md-sys-color-on-surface);
 }
 
+.idle-card__tagline {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--md-sys-color-primary);
+}
+
 .idle-card__copy {
   font-size: 0.9375rem;
   line-height: 1.55;
@@ -1286,6 +1294,14 @@ p {
   font-weight: 500;
   letter-spacing: 0;
   color: var(--md-sys-color-on-surface);
+}
+
+.onboarding-m__lead {
+  margin: -4px 0 0;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--md-sys-color-primary);
 }
 
 .onboarding-m__copy {

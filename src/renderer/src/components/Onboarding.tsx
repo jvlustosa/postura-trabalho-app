@@ -120,9 +120,11 @@ const WelcomeStep = (): ReactElement => (
     <div className="onboarding-m__hero" aria-hidden="true">
       <img className="onboarding-m__hero-logo" src="./app-logo.png" alt="" />
     </div>
-    <h2 className="onboarding-m__title">Postura sob controle</h2>
+    <h2 className="onboarding-m__title">Postura alinhada no trabalho</h2>
+    <p className="onboarding-m__lead">Evite dores, mantenha a saúde da sua coluna.</p>
     <p className="onboarding-m__copy">
-      Monitoramos sua postura pela webcam, em tempo real, sem enviar nada para a internet.
+      A webcam percebe quando você escorrega na cadeira e o app avisa na hora. Nada sai deste
+      computador.
     </p>
   </div>
 );

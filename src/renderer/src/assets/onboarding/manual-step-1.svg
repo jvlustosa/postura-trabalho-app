@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280" width="480" height="280" fill="none" aria-hidden="true">
+  <!-- Scene: background + decor -->
+  <rect width="480" height="280" fill="#f4f1ec"/>
+  <rect x="412" y="44" width="48" height="58" rx="3" fill="#dde8e5" stroke="#8fa9a3" stroke-width="1.25"/>
+  <rect x="418" y="50" width="36" height="44" rx="1" fill="#c5d5d1" opacity="0.65"/>
+  <path d="M28 206V176" stroke="#5a7a62" stroke-width="2" stroke-linecap="round"/>
+  <ellipse cx="28" cy="168" rx="14" ry="20" fill="#7d9c82"/>
+  <rect x="12" y="206" width="36" height="28" rx="2" fill="#ebe6df" stroke="#cfc8be" stroke-width="1"/>
+  <!-- Mesa -->
+  <rect x="118" y="200" width="286" height="9" fill="#fff" stroke="#d4cfc7" stroke-width="1"/>
+  <line x1="124" y1="200" x2="124" y2="254" stroke="#2d3436" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="398" y1="200" x2="398" y2="254" stroke="#2d3436" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Cadeira -->
+  <path d="M86 172c-2-22 12-38 30-36 8 1 14 8 16 18l2 46H96l-2-40z" fill="#2d3436"/>
+  <path d="M132 154l8-2v48h-8" stroke="#2d3436" stroke-width="5" stroke-linecap="round"/>
+  <!-- Monitor + webcam -->
+  <rect x="272" y="76" width="102" height="70" rx="4" fill="#fff" stroke="#2d3436" stroke-width="1.5"/>
+  <rect x="276" y="80" width="94" height="58" rx="2" fill="#eef2f1" stroke="#2d3436" stroke-width="1"/>
+  <line x1="323" y1="148" x2="323" y2="180" stroke="#2d3436" stroke-width="2"/>
+  <rect x="312" y="180" width="22" height="5" rx="1" fill="#2d3436"/>
+  <rect x="316" y="68" width="14" height="10" rx="3" fill="#2d3436"/>
+  <!-- Teclado -->
+  <rect x="188" y="190" width="76" height="12" rx="2" fill="#fff" stroke="#c4bdb2" stroke-width="1"/>
+  <!-- Slouched figure -->
+  <path d="M168 205v-6l6-82c4-24 22-38 44-34 10 2 18 10 20 22l8 58c2 14-6 28-20 34" fill="#0d7377" stroke="#0a5c5c" stroke-width="1"/>
+  <path d="M196 89c18-10 36-4 42 14 3 10-2 22-12 28" fill="#0d7377"/>
+  <ellipse cx="228" cy="88" rx="17" ry="18" fill="#e8dfd4" stroke="#2d3436" stroke-width="1"/>
+  <path d="M210 74c8-8 24-10 36-2 6 4 8 12 6 20" fill="#2d3436"/>
+  <circle cx="236" cy="88" r="2.2" fill="#2d3436"/>
+  <!-- Tension arc -->
+  <path d="M170 132c28 22 48 48 52 78" stroke="#c45c5c" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.85"/>
+</svg>

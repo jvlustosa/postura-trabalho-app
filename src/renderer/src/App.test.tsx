@@ -63,7 +63,7 @@ describe('App', () => {
     render(<App />);
 
     expect(
-      screen.getByRole('heading', { name: /postura sob controle/i }),
+      screen.getByRole('heading', { name: /postura alinhada no trabalho/i }),
     ).toBeInTheDocument();
   });
 
@@ -71,8 +71,8 @@ describe('App', () => {
     seedOnboarded();
     render(<App />);
 
-    expect(screen.getByRole('button', { name: /ativar check de postura/i })).toBeInTheDocument();
-    expect(screen.getByText(/processado localmente/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ativar monitoramento/i })).toBeInTheDocument();
+    expect(screen.getByText(/só no seu computador/i)).toBeInTheDocument();
   });
 
   it('clicking the brand logo returns to the main screen from settings', async () => {
@@ -81,10 +81,10 @@ describe('App', () => {
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: /abrir configurações/i }));
-    expect(screen.queryByRole('button', { name: /ativar check de postura/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ativar monitoramento/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /voltar para a tela principal/i }));
-    expect(screen.getByRole('button', { name: /ativar check de postura/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ativar monitoramento/i })).toBeInTheDocument();
   });
 
   it('clicking the brand logo returns to the main screen from timeline', async () => {
@@ -93,9 +93,9 @@ describe('App', () => {
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: /abrir histórico/i }));
-    expect(screen.queryByRole('button', { name: /ativar check de postura/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ativar monitoramento/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /voltar para a tela principal/i }));
-    expect(screen.getByRole('button', { name: /ativar check de postura/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ativar monitoramento/i })).toBeInTheDocument();
   });
 });

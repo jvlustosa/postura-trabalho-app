@@ -412,16 +412,18 @@ const IdlePanel = ({
 }): ReactElement => (
   <section className="idle-card">
     <header className="idle-card__header">
-      <h2 className="idle-card__title">Pronto para iniciar</h2>
+      <h2 className="idle-card__title">Postura alinhada no trabalho</h2>
+      <p className="idle-card__tagline">Evite dores, mantenha a saúde da sua coluna.</p>
       <p className="idle-card__copy">
-        Calibragem rápida e monitoramento contínuo da sua postura.
+        Ligue o monitoramento: a webcam avisa quando você desalinha. Sem cronômetro, sem nuvem —
+        tudo no seu PC.
       </p>
     </header>
 
     <div className="idle-card__cta-stack">
       <button className="button button--filled idle-card__cta" type="button" onClick={onStart}>
         <Play size={18} aria-hidden="true" />
-        Ativar check de postura
+        Ativar monitoramento
       </button>
       {scheduleSummary ? (
         <p className="idle-card__schedule-hint" aria-live="polite">
@@ -434,15 +436,15 @@ const IdlePanel = ({
     <ul className="idle-card__features" role="list">
       <li className="feature-item">
         <Shield size={16} aria-hidden="true" />
-        <span>Processado localmente</span>
+        <span>Só no seu computador</span>
       </li>
       <li className="feature-item">
         <Clock size={16} aria-hidden="true" />
-        <span>Calibragem rápida</span>
+        <span>Sem filas nem timer</span>
       </li>
       <li className="feature-item">
         <Activity size={16} aria-hidden="true" />
-        <span>Alertas em tempo real</span>
+        <span>Aviso quando desalinhar</span>
       </li>
     </ul>
   </section>
