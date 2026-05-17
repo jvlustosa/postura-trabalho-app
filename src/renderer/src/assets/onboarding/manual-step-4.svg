@@ -16,17 +16,18 @@
   <rect x="312" y="180" width="22" height="5" rx="1" fill="#2d3436"/>
   <rect x="316" y="68" width="14" height="10" rx="3" fill="#2d3436"/>
   <rect x="188" y="190" width="76" height="12" rx="2" fill="#fff" stroke="#c4bdb2" stroke-width="1"/>
-  <!-- Tela: hábito / valor  mini tendência positiva -->
+  <!-- Screen: positive trend -->
   <path d="M288 124 L302 118 L318 122 L332 112 L348 108" stroke="#4a9d6f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <circle cx="348" cy="108" r="4" fill="#4a9d6f" opacity="0.9"/>
   <path d="M284 128h72" stroke="#b8c5c0" stroke-width="1" opacity="0.8"/>
-  <!-- Boneco: postura boa + leve satisfação -->
+  <!-- Figure: upright posture, happy expression -->
   <path d="M172 205V118c2-20 18-32 38-30 12 1 20 8 24 20l10 97" fill="#0d7377" stroke="#0a5c5c" stroke-width="1"/>
   <path d="M198 104h48c8 0 14 6 14 14v24l-8 48" fill="#0d7377"/>
-  <ellipse cx="234" cy="96" rx="17" ry="18" fill="#e8dfd4" stroke="#2d3436" stroke-width="1"/>
-  <path d="M218 82c10-10 28-10 40 0 6 5 8 14 4 22l-4 2" fill="#2d3436"/>
-  <circle cx="242" cy="96" r="2.2" fill="#2d3436"/>
-  <path d="M228 104c6 4 12 4 18 0" stroke="#2d3436" stroke-width="1.3" stroke-linecap="round"/>
+  <ellipse cx="234" cy="94" rx="17" ry="18" fill="#e8dfd4" stroke="#2d3436" stroke-width="1"/>
+  <path d="M218 80c10-10 28-10 40 0 6 5 8 14 4 22l-4 2" fill="#2d3436"/>
+  <circle cx="242" cy="93" r="2.2" fill="#2d3436"/>
+  <path d="M239 91c1.5-0.5 3-0.5 4.5 0" stroke="#2d3436" stroke-width="1" stroke-linecap="round"/>
+  <path d="M226 100c5 7 14 9 22 4 4-2 7-6 8-10" stroke="#2d3436" stroke-width="1.35" stroke-linecap="round" fill="none"/>
   <line x1="182" y1="118" x2="182" y2="198" stroke="#4a9d6f" stroke-width="1.6" stroke-dasharray="6 5" stroke-linecap="round" opacity="0.75"/>
   <circle cx="323" cy="73" r="11" stroke="#4a9d6f" stroke-width="1.5" stroke-dasharray="4 3" fill="none" opacity="0.85"/>
 </svg>
