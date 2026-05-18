@@ -1,4 +1,10 @@
-import type { LandmarkName, PoseLandmark, PostureAnalysis, PostureThresholds } from './types';
+import type {
+  LandmarkName,
+  PoseLandmark,
+  PostureAnalysis,
+  PostureReason,
+  PostureThresholds,
+} from './types';
 
 const defaultThresholds: PostureThresholds = {
   minVisibility: 0.55,
@@ -17,13 +23,12 @@ const defaultThresholds: PostureThresholds = {
   slouchBad: 0.84,
   headDownWarning: 0.92,
   headDownBad: 0.82,
+  hunchSignificantDeficit: 0.03,
+  hunchCompositeWarning: 0.04,
+  hunchCompositeBad: 0.075,
 };
 
 const MIN_SHOULDER_WIDTH = 0.04;
-
-const HUNCH_SIGNIFICANT_DEFICIT = 0.03;
-const HUNCH_COMPOSITE_WARNING = 0.12;
-const HUNCH_COMPOSITE_BAD = 0.22;
 
 const requiredLandmarks: LandmarkName[] = ['nose', 'leftShoulder', 'rightShoulder'];
 
@@ -180,27 +185,31 @@ export const analyzePosture = (
   }
 
   // Composite hunched-back detection: combines sub-warning signals across
-  // shoulder narrowing, torso collapse and head dropping. Catches subtle
-  // curvature where each axis alone is below threshold but the overall
-  // posture clearly indicates a curved upper back. Requires at least two
-  // axes with meaningful deficit so a single isolated signal (e.g. only
-  // head drop) cannot masquerade as a back-curvature problem.
-  const availableSignals =
-    (hasWidthBaseline ? 1 : 0) + (hasTorsoBaseline ? 1 : 0) + (hasHeadVerticalBaseline ? 1 : 0);
-  const significantSignals = [widthDeficit, torsoDeficit, headDownDeficit].filter(
-    (deficit) => deficit >= HUNCH_SIGNIFICANT_DEFICIT,
+  // shoulder narrowing, torso collapse and head dropping. Uses AVERAGE
+  // deficit across available signals so behavior stays consistent whether
+  // 2 or 3 baselines are present (desk users frequently lack hip visibility).
+  // Requires at least two axes with meaningful deficit so a single isolated
+  // signal cannot masquerade as a back-curvature problem.
+  const availableDeficits: number[] = [];
+  if (hasWidthBaseline) availableDeficits.push(widthDeficit);
+  if (hasTorsoBaseline) availableDeficits.push(torsoDeficit);
+  if (hasHeadVerticalBaseline) availableDeficits.push(headDownDeficit);
+
+  const significantSignals = availableDeficits.filter(
+    (deficit) => deficit >= thresholds.hunchSignificantDeficit,
   ).length;
 
-  if (availableSignals >= 2 && significantSignals >= 2) {
-    const composite = widthDeficit + torsoDeficit + headDownDeficit;
+  if (availableDeficits.length >= 2 && significantSignals >= 2) {
+    const avgDeficit =
+      availableDeficits.reduce((sum, d) => sum + d, 0) / availableDeficits.length;
     const addSlouch = (): void => {
       if (!reasons.includes('slouch')) reasons.push('slouch');
     };
 
-    if (composite >= HUNCH_COMPOSITE_BAD) {
+    if (avgDeficit >= thresholds.hunchCompositeBad) {
       addSlouch();
       severity = Math.max(severity, 2);
-    } else if (composite >= HUNCH_COMPOSITE_WARNING) {
+    } else if (avgDeficit >= thresholds.hunchCompositeWarning) {
       addSlouch();
       severity = Math.max(severity, 1);
     }
@@ -208,9 +217,28 @@ export const analyzePosture = (
 
   const state = severity === 0 ? 'good' : severity === 1 ? 'warning' : 'bad';
 
-  const rawScore = 100 - Math.round((headOffset + shoulderTilt + neckTilt) * 200);
-  const penaltyPerReason = reasons.filter((r) => r !== 'low-confidence').length * 8;
-  const score = Math.max(0, Math.min(100, rawScore - penaltyPerReason));
+  const reasonPenalties: Record<Exclude<PostureReason, 'low-confidence'>, number> = {
+    'head-forward': 12,
+    'shoulder-tilt': 12,
+    'neck-tilt': 12,
+    'head-down': 18,
+    slouch: 25,
+  };
+  let penaltyPerReason = 0;
+  for (const reason of reasons) {
+    if (reason === 'low-confidence') continue;
+    penaltyPerReason += reasonPenalties[reason];
+  }
+  // Costas curvas pesam ainda mais quando o estado é claramente ruim
+  if (severity === 2 && reasons.includes('slouch')) {
+    penaltyPerReason += 10;
+  }
+
+  // Subtle gradation within "good" so the score reflects micro-deviations
+  // even when no reason is triggered. Capped so it never pushes a "good"
+  // result below the warning floor (reasonPenalties handle real penalties).
+  const microPenalty = Math.min(8, Math.round((headOffset + shoulderTilt + neckTilt) * 60));
+  const score = Math.max(0, Math.min(100, 100 - microPenalty - penaltyPerReason));
 
   const message =
     state === 'good'

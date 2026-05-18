@@ -5,6 +5,9 @@ export type AlertThresholdSeconds = 30 | 60 | 120 | 180;
 
 export type AutoStartMode = 'off' | 'on-launch' | 'schedule';
 
+export type CameraMode = 'continuous' | 'shared';
+export type SharedCheckIntervalSeconds = 20 | 30 | 60 | 120;
+
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface ScheduleConfig {
@@ -33,6 +36,7 @@ export interface AppSettings {
   mirrorVideo: boolean;
   showOverlay: boolean;
   onboardingCompleted: boolean;
+  cameraPermissionGranted: boolean;
   screenHeight: number;
   calibration: CalibrationData | null;
   alertsEnabled: boolean;
@@ -43,6 +47,8 @@ export interface AppSettings {
   compactMode: boolean;
   autoStartMode: AutoStartMode;
   schedule: ScheduleConfig;
+  cameraMode: CameraMode;
+  sharedCheckIntervalSeconds: SharedCheckIntervalSeconds;
 }
 
 export const defaultSchedule: ScheduleConfig = {
@@ -57,6 +63,7 @@ export const defaultSettings: AppSettings = {
   mirrorVideo: true,
   showOverlay: true,
   onboardingCompleted: false,
+  cameraPermissionGranted: false,
   screenHeight: 50,
   calibration: null,
   alertsEnabled: true,
@@ -67,4 +74,6 @@ export const defaultSettings: AppSettings = {
   compactMode: false,
   autoStartMode: 'off',
   schedule: defaultSchedule,
+  cameraMode: 'continuous',
+  sharedCheckIntervalSeconds: 30,
 };

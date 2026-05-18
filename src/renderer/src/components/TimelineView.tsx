@@ -1,18 +1,18 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
-import { Flame, Trash2, TrendingUp, X } from 'lucide-react';
+import { Activity, BarChart3, Flame, History, TrendingUp } from 'lucide-react';
 
-import { clearTimeline, hydrateTimeline, loadTimeline } from '../lib/timeline/storage';
+import { hydrateTimeline, loadTimeline } from '../lib/timeline/storage';
 import type { TimelineSegment, TimelineState } from '../lib/timeline/types';
 import {
   clipSegments,
   computeBestStreak,
   computeCurrentStreak,
-  computeSparkline,
+  computeTimelineBuckets,
   STATE_ORDER,
   sumTotals,
-  type SparklinePoint,
+  type TimelineBucket,
 } from '../lib/timeline/stats';
-import { useConfirm } from './ConfirmDialog';
+import { Tooltip } from './Tooltip';
 
 interface TimelineViewProps {
   onClose: () => void;
@@ -30,7 +30,7 @@ const RANGE_LABEL: Record<Range, string> = {
   '7d': 'Últimos 7 dias',
 };
 
-const SPARKLINE_BUCKETS: Record<Range, number> = {
+const TIMELINE_BUCKETS: Record<Range, number> = {
   '24h': 24,
   '7d': 28,
 };
@@ -62,29 +62,36 @@ const formatBucketLabel = (range: Range, bucketStart: number): string => {
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
 
-interface SparklineChartProps {
-  points: readonly SparklinePoint[];
+const formatBucketRangeLabel = (range: Range, bucket: TimelineBucket): string => {
+  const start = new Date(bucket.bucketStart);
+  const end = new Date(bucket.bucketEnd);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  if (range === '24h') {
+    return `${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  }
+  return `${pad(start.getDate())}/${pad(start.getMonth() + 1)} ${pad(start.getHours())}h – ${pad(end.getDate())}/${pad(end.getMonth() + 1)} ${pad(end.getHours())}h`;
+};
+
+interface TimelineChartProps {
+  buckets: readonly TimelineBucket[];
   range: Range;
 }
 
-const SparklineChart = ({ points, range }: SparklineChartProps): ReactElement => {
-  const width = 320;
-  const height = 64;
-  const paddingY = 6;
-  const usableH = height - paddingY * 2;
-  const n = points.length;
+const STACK_ORDER: readonly TimelineState[] = ['bad', 'warning', 'good'];
+
+const stateMs = (bucket: TimelineBucket, state: TimelineState): number => {
+  if (state === 'good') return bucket.goodMs;
+  if (state === 'warning') return bucket.warningMs;
+  return bucket.badMs;
+};
+
+const TimelineChart = ({ buckets, range }: TimelineChartProps): ReactElement => {
+  const n = buckets.length;
   if (n === 0) {
-    return <div className="sparkline sparkline--empty" aria-hidden="true" />;
+    return <div className="timeline-chart timeline-chart--empty" aria-hidden="true" />;
   }
 
-  const xAt = (i: number): number => (n === 1 ? width / 2 : (i / (n - 1)) * width);
-  const yAt = (ratio: number): number => paddingY + (1 - ratio) * usableH;
-
-  const linePoints = points
-    .map((p, i) => `${xAt(i).toFixed(2)},${yAt(p.goodRatio).toFixed(2)}`)
-    .join(' ');
-
-  const areaPoints = `0,${height} ${linePoints} ${width},${height}`;
+  const maxMonitored = Math.max(1, ...buckets.map((b) => b.monitoredMs));
 
   const desiredLabels = range === '24h' ? 5 : 6;
   const labelIndices = Array.from({ length: desiredLabels }, (_, k) =>
@@ -93,43 +100,75 @@ const SparklineChart = ({ points, range }: SparklineChartProps): ReactElement =>
   const labelSet = new Set(labelIndices);
 
   return (
-    <div className="sparkline" role="img" aria-label="Tendência de postura ok ao longo do tempo">
-      <svg viewBox={`0 0 ${width} ${height}`} className="sparkline__svg" preserveAspectRatio="none">
-        <line
-          x1={0}
-          x2={width}
-          y1={yAt(0.5)}
-          y2={yAt(0.5)}
-          className="sparkline__grid"
-          strokeDasharray="2 4"
-        />
-        <polygon points={areaPoints} className="sparkline__area" />
-        <polyline points={linePoints} className="sparkline__line" />
-        {points.map((p, i) => {
-          if (p.monitoredMs <= 0) return null;
+    <div className="timeline-chart" role="img" aria-label="Distribuição de postura ao longo do tempo">
+      <div className="timeline-chart__plot">
+        {buckets.map((bucket) => {
+          const intensity = bucket.monitoredMs / maxMonitored;
+          const heightPct = bucket.monitoredMs > 0 ? Math.max(4, intensity * 100) : 0;
+          const tooltipLabel = (
+            <div className="timeline-chart__tooltip">
+              <strong>{formatBucketRangeLabel(range, bucket)}</strong>
+              {bucket.monitoredMs === 0 ? (
+                <span>Sem monitoramento</span>
+              ) : (
+                STATE_ORDER.map((state) => {
+                  const ms = stateMs(bucket, state);
+                  if (ms <= 0) return null;
+                  return (
+                    <span key={state} className="timeline-chart__tooltip-row">
+                      <span
+                        className={`timeline-chart__tooltip-dot timeline-chart__tooltip-dot--${state}`}
+                        aria-hidden="true"
+                      />
+                      <span className="timeline-chart__tooltip-label">{STATE_LABEL[state]}</span>
+                      <span className="timeline-chart__tooltip-value">{formatDuration(ms)}</span>
+                    </span>
+                  );
+                })
+              )}
+            </div>
+          );
           return (
-            <circle
-              key={p.bucketStart}
-              cx={xAt(i)}
-              cy={yAt(p.goodRatio)}
-              r={2.5}
-              className="sparkline__dot"
-            />
+            <Tooltip key={bucket.bucketStart} label={tooltipLabel} placement="top" delay={150}>
+              <div className="timeline-chart__bucket" tabIndex={0}>
+                {bucket.monitoredMs > 0 ? (
+                  <div
+                    className="timeline-chart__column"
+                    style={{ height: `${heightPct}%` }}
+                  >
+                    {STACK_ORDER.map((state) => {
+                      const ms = stateMs(bucket, state);
+                      if (ms <= 0) return null;
+                      const pct = (ms / bucket.monitoredMs) * 100;
+                      return (
+                        <span
+                          key={state}
+                          className={`timeline-chart__seg timeline-chart__seg--${state}`}
+                          style={{ height: `${pct}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="timeline-chart__empty-dot" aria-hidden="true" />
+                )}
+              </div>
+            </Tooltip>
           );
         })}
-      </svg>
-      <div className="sparkline__axis" aria-hidden="true">
-        {points.map((p, i) => {
+      </div>
+      <div className="timeline-chart__axis" aria-hidden="true">
+        {buckets.map((bucket, i) => {
           if (!labelSet.has(i)) return null;
           const ratio = n === 1 ? 0.5 : i / (n - 1);
           const align = ratio < 0.04 ? 'start' : ratio > 0.96 ? 'end' : 'center';
           return (
             <span
-              key={p.bucketStart}
-              className={`sparkline__tick sparkline__tick--${align}`}
+              key={bucket.bucketStart}
+              className={`timeline-chart__tick timeline-chart__tick--${align}`}
               style={{ left: `${ratio * 100}%` }}
             >
-              {formatBucketLabel(range, p.bucketStart)}
+              {formatBucketLabel(range, bucket.bucketStart)}
             </span>
           );
         })}
@@ -142,7 +181,6 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
   const [segments, setSegments] = useState<TimelineSegment[]>([]);
   const [range, setRange] = useState<Range>('24h');
   const [now, setNow] = useState<number>(() => Date.now());
-  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     let cancelled = false;
@@ -171,101 +209,94 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
 
   const totals = useMemo(() => sumTotals(clipped), [clipped]);
   const hasData = totals.monitored > 0;
+  const hasAnyHistory = segments.length > 0;
   const pct = (value: number): number => (hasData ? value / totals.monitored : 0);
 
   const bestStreak = useMemo(() => computeBestStreak(segments), [segments]);
   const currentStreak = useMemo(() => computeCurrentStreak(segments, now), [segments, now]);
 
-  const sparkline = useMemo(
-    () => computeSparkline(clipped, rangeStart, rangeEnd, SPARKLINE_BUCKETS[range]),
+  const buckets = useMemo(
+    () => computeTimelineBuckets(clipped, rangeStart, rangeEnd, TIMELINE_BUCKETS[range]),
     [clipped, rangeStart, rangeEnd, range],
   );
 
-  const handleClear = async (): Promise<void> => {
-    const ok = await confirm({
-      title: 'Limpar histórico?',
-      message: 'Os dados de postura registrados serão apagados e essa ação não pode ser desfeita.',
-      confirmLabel: 'Limpar',
-      destructive: true,
-    });
-    if (!ok) return;
-    clearTimeline();
-    setSegments([]);
-  };
-
   return (
-    <section className="card timeline-card" aria-label="Histórico de postura">
-      <header className="timeline-card__header">
+    <section className="card timeline-card settings-card" aria-label="Histórico de postura">
+      <header className="settings-card__header">
         <div className="timeline-card__heading">
-          <img
-            className="timeline-card__icon"
-            src="./spine.svg"
-            alt=""
-            aria-hidden="true"
-            width={20}
-            height={20}
-          />
-          <div>
-            <h2 className="timeline-card__title">Histórico de postura</h2>
-            <p className="timeline-card__subtitle">
-              <span>Tempo monitorado: {formatDuration(totals.monitored)}</span>
-            </p>
+          <div className="timeline-card__title-group">
+            <span className="timeline-card__title-icon" aria-hidden="true">
+              <History size={20} />
+            </span>
+            <h2 className="settings-card__title">Histórico de postura</h2>
           </div>
+          {hasAnyHistory ? (
+            <p className="timeline-card__subtitle">
+              Tempo monitorado: {formatDuration(totals.monitored)}
+            </p>
+          ) : null}
         </div>
-        <button
-          className="icon-button"
-          type="button"
-          onClick={onClose}
-          aria-label="Fechar histórico"
-        >
-          <X size={20} aria-hidden="true" />
+        <button className="button button--text" type="button" onClick={onClose}>
+          Fechar
         </button>
       </header>
 
-      <div className="streak-row">
-        <div className="streak-card streak-card--record">
-          <div className="streak-card__icon" aria-hidden="true">
-            <Flame size={18} />
-          </div>
-          <div className="streak-card__content">
-            <span className="streak-card__label">Recorde de postura</span>
-            <span className="streak-card__value">
-              {bestStreak > 0 ? formatDuration(bestStreak) : '-'}
-            </span>
-          </div>
+      {!hasAnyHistory ? (
+        <div className="timeline-empty timeline-empty--hero" role="status">
+          <span className="timeline-empty__icon" aria-hidden="true">
+            <Activity size={32} />
+          </span>
+          <p>Nenhum histórico ainda</p>
+          <span>
+            Ative o monitoramento e o seu tempo de postura ok aparece aqui em segundos.
+          </span>
         </div>
-        <div className="streak-card streak-card--current">
-          <div className="streak-card__icon streak-card__icon--current" aria-hidden="true">
-            <TrendingUp size={18} />
+      ) : (
+        <>
+          <div className="streak-row">
+            <div className="streak-card streak-card--record">
+              <div className="streak-card__icon" aria-hidden="true">
+                <Flame size={18} />
+              </div>
+              <div className="streak-card__content">
+                <span className="streak-card__label">Recorde de postura</span>
+                <span className="streak-card__value">
+                  {bestStreak > 0 ? formatDuration(bestStreak) : '-'}
+                </span>
+              </div>
+            </div>
+            <div className="streak-card streak-card--current">
+              <div className="streak-card__icon streak-card__icon--current" aria-hidden="true">
+                <TrendingUp size={18} />
+              </div>
+              <div className="streak-card__content">
+                <span className="streak-card__label">Streak atual</span>
+                <span className="streak-card__value">
+                  {currentStreak > 0 ? formatDuration(currentStreak) : '-'}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="streak-card__content">
-            <span className="streak-card__label">Streak atual</span>
-            <span className="streak-card__value">
-              {currentStreak > 0 ? formatDuration(currentStreak) : '-'}
-            </span>
+
+          <div className="segmented" role="radiogroup" aria-label="Janela de tempo">
+            {(Object.keys(RANGE_LABEL) as Range[]).map((option) => {
+              const isSelected = option === range;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
+                  onClick={() => setRange(option)}
+                >
+                  {RANGE_LABEL[option]}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      </div>
 
-      <div className="segmented" role="radiogroup" aria-label="Janela de tempo">
-        {(Object.keys(RANGE_LABEL) as Range[]).map((option) => {
-          const isSelected = option === range;
-          return (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={isSelected}
-              className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
-              onClick={() => setRange(option)}
-            >
-              {RANGE_LABEL[option]}
-            </button>
-          );
-        })}
-      </div>
-
-      {hasData ? (
+          {hasData ? (
         <>
           <div className="timeline-summary">
             <div className="donut-chart" aria-hidden="true">
@@ -331,43 +362,40 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
             </ul>
           </div>
 
-          <section className="sparkline-section" aria-label="Tendência de postura ok">
-            <header className="sparkline-section__header">
-              <h3 className="sparkline-section__title">Tendência de postura ok</h3>
-              <span className="sparkline-section__hint">% por {range === '24h' ? 'hora' : 'período'}</span>
+          <section className="timeline-chart-section" aria-label="Linha do tempo de postura">
+            <header className="timeline-chart-section__header">
+              <span className="timeline-chart-section__title-group">
+                <BarChart3 size={16} aria-hidden="true" className="timeline-chart-section__icon" />
+                <h3 className="timeline-chart-section__title">Linha do tempo</h3>
+              </span>
+              <span className="timeline-chart-section__hint">
+                por {range === '24h' ? 'hora' : '6h'}
+              </span>
             </header>
-            <SparklineChart points={sparkline} range={range} />
+            <TimelineChart buckets={buckets} range={range} />
+            <ul className="timeline-chart__legend" aria-hidden="true">
+              {STATE_ORDER.map((state) => (
+                <li key={state} className="timeline-chart__legend-item">
+                  <span
+                    className={`timeline-chart__legend-dot timeline-chart__legend-dot--${state}`}
+                  />
+                  <span>{STATE_LABEL[state]}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         </>
-      ) : (
-        <div className="timeline-empty" role="status">
-          <img
-            src="./spine-outline.svg"
-            alt=""
-            aria-hidden="true"
-            width={28}
-            height={28}
-          />
-          <p>Sem dados nesta janela.</p>
-          <span>Ative o monitoramento para começar a registrar.</span>
-        </div>
+          ) : (
+            <div className="timeline-empty" role="status">
+              <span className="timeline-empty__icon" aria-hidden="true">
+                <Activity size={24} />
+              </span>
+              <p>Sem dados nesta janela</p>
+              <span>Troque o período ou ative o monitoramento para registrar.</span>
+            </div>
+          )}
+        </>
       )}
-
-      <div className="timeline-card__footer">
-        <button
-          className="button button--text"
-          type="button"
-          onClick={() => {
-            void handleClear();
-          }}
-          disabled={segments.length === 0}
-        >
-          <Trash2 size={16} aria-hidden="true" />
-          Limpar histórico
-        </button>
-      </div>
-
-      {confirmDialog}
     </section>
   );
 };

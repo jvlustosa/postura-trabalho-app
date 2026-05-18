@@ -36,19 +36,13 @@ const writeQueue = new Map<string, Promise<void>>();
 const MINI_WIDTH = 320;
 const MINI_HEIGHT = 240;
 const MINI_MARGIN = 16;
+const MINI_MIN_WIDTH = 220;
+const MINI_MIN_HEIGHT = 160;
 
 const PRELOAD_PATH = join(__dirname, '../preload/index.js');
 
-interface MiniSnapshot {
-  bounds: Electron.Rectangle;
-  alwaysOnTop: boolean;
-  resizable: boolean;
-  minSize: [number, number];
-  hadFrame: boolean;
-}
-
 let mainWindow: BrowserWindow | null = null;
-let miniSnapshot: MiniSnapshot | null = null;
+let miniWindow: BrowserWindow | null = null;
 let isQuitting = false;
 let analysisActive = false;
 let floatingEnabled = true;
@@ -74,60 +68,116 @@ const attachHardReloadShortcut = (window: BrowserWindow): void => {
   });
 };
 
-const applyMiniLayout = (window: BrowserWindow): void => {
-  if (window.isDestroyed() || !miniSnapshot) return;
-
+const computeMiniBounds = (): Electron.Rectangle => {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const { workArea } = display;
-  const x = Math.round(workArea.x + workArea.width - MINI_WIDTH - MINI_MARGIN);
-  const y = Math.round(workArea.y + workArea.height - MINI_HEIGHT - MINI_MARGIN);
+  return {
+    x: Math.round(workArea.x + workArea.width - MINI_WIDTH - MINI_MARGIN),
+    y: Math.round(workArea.y + workArea.height - MINI_HEIGHT - MINI_MARGIN),
+    width: MINI_WIDTH,
+    height: MINI_HEIGHT,
+  };
+};
 
-  window.setMinimumSize(220, 160);
-  window.setResizable(true);
+const loadRendererInto = (window: BrowserWindow, hash = ''): void => {
+  const dev = process.env.ELECTRON_RENDERER_URL;
+  if (dev) {
+    void window.loadURL(hash ? `${dev}${hash.startsWith('#') ? hash : `#${hash}`}` : dev);
+    return;
+  }
+  void window.loadFile(join(__dirname, '../renderer/index.html'), { hash });
+};
+
+const notifyMiniActive = (active: boolean): void => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('posture-mini:active', active);
+  }
+};
+
+const CAMERA_HANDOFF_DELAY_MS = 250;
+
+const createMiniWindow = (): void => {
+  const main = mainWindow;
+  if (!main || main.isDestroyed()) {
+    console.warn('[mini] cannot open: main window missing');
+    return;
+  }
+
+  const window = new BrowserWindow({
+    ...computeMiniBounds(),
+    minWidth: MINI_MIN_WIDTH,
+    minHeight: MINI_MIN_HEIGHT,
+    show: false,
+    title: 'Postura Trabalho — mini',
+    backgroundColor: '#07080d',
+    frame: false,
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: PRELOAD_PATH,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  miniWindow = window;
+  console.log('[mini] window created');
+
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  window.setBounds({ x, y, width: MINI_WIDTH, height: MINI_HEIGHT }, true);
+
+  window.once('ready-to-show', () => {
+    if (window.isDestroyed()) return;
+    window.show();
+    window.focus();
+    console.log('[mini] window shown');
+  });
+
+  window.on('closed', () => {
+    console.log('[mini] window closed');
+    if (miniWindow === window) {
+      miniWindow = null;
+    }
+    notifyMiniActive(false);
+    const m = mainWindow;
+    if (!m || m.isDestroyed() || isQuitting) return;
+    if (!m.isVisible()) m.show();
+    if (m.isMinimized()) m.restore();
+    m.focus();
+  });
+
+  attachHardReloadShortcut(window);
+  loadRendererInto(window, '#mini');
+
+  if (main.isVisible()) main.hide();
 };
 
 const enterMiniMode = (): void => {
-  const window = mainWindow;
-  if (!window || window.isDestroyed() || miniSnapshot) return;
-
-  miniSnapshot = {
-    bounds: window.getBounds(),
-    alwaysOnTop: window.isAlwaysOnTop(),
-    resizable: window.isResizable(),
-    minSize: window.getMinimumSize() as [number, number],
-    hadFrame: true,
-  };
-
-  const needDeferredLayout = window.isMaximized() || window.isFullScreen();
-  if (window.isMaximized()) {
-    window.unmaximize();
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    miniWindow.show();
+    miniWindow.focus();
+    return;
   }
-  if (window.isFullScreen()) {
-    window.setFullScreen(false);
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    console.warn('[mini] enter aborted: main window missing');
+    return;
   }
 
-  if (needDeferredLayout) {
-    setTimeout(() => applyMiniLayout(window), 120);
-  } else {
-    applyMiniLayout(window);
-  }
+  console.log('[mini] entering mini mode');
+  notifyMiniActive(true);
+  setTimeout(createMiniWindow, CAMERA_HANDOFF_DELAY_MS);
 };
 
 const exitMiniMode = (): void => {
-  const window = mainWindow;
-  if (!window || window.isDestroyed() || !miniSnapshot) return;
-
-  const snap = miniSnapshot;
-  miniSnapshot = null;
-
-  window.setAlwaysOnTop(snap.alwaysOnTop);
-  window.setVisibleOnAllWorkspaces(false);
-  window.setMinimumSize(snap.minSize[0], snap.minSize[1]);
-  window.setResizable(snap.resizable);
-  window.setBounds(snap.bounds, true);
+  const window = miniWindow;
+  if (!window || window.isDestroyed()) return;
+  window.close();
 };
 
 const restoreMainWindow = (): void => {
@@ -142,7 +192,7 @@ const restoreMainWindow = (): void => {
 const sendToBackground = (): void => {
   const window = mainWindow;
   if (!window || window.isDestroyed()) return;
-  if (miniSnapshot) exitMiniMode();
+  if (miniWindow && !miniWindow.isDestroyed()) miniWindow.close();
   hidePostureAlert();
   if (window.isVisible()) window.hide();
   showPostureFloating(PRELOAD_PATH, floatingOpacity);
@@ -205,9 +255,9 @@ const createWindow = (): void => {
   window.on('closed', () => {
     hidePostureAlert();
     hidePostureFloating();
+    if (miniWindow && !miniWindow.isDestroyed()) miniWindow.close();
     if (mainWindow === window) {
       mainWindow = null;
-      miniSnapshot = null;
     }
   });
 
@@ -326,10 +376,12 @@ const registerIpcHandlers = (): void => {
   });
 
   ipcMain.on('posture-mini:enter', () => {
+    console.log('[main] IPC posture-mini:enter received');
     enterMiniMode();
   });
 
   ipcMain.on('posture-mini:exit', () => {
+    console.log('[main] IPC posture-mini:exit received');
     exitMiniMode();
   });
 

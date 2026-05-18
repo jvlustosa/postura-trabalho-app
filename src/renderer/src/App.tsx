@@ -3,24 +3,29 @@ import {
   Activity,
   ArrowLeft,
   CalendarClock,
+  Camera,
   Clock,
   History,
-  Maximize2,
+  Lock,
   Minus,
   Pause,
   PictureInPicture2,
   Play,
   Settings as SettingsIcon,
   Shield,
+  ShieldCheck,
   Square,
   StopCircle,
   X,
 } from 'lucide-react';
 
+import { classifyMediaError } from './lib/media/classifyMediaError';
+
 import { Onboarding } from './components/Onboarding';
 import { PostureCheck } from './components/PostureCheck';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimelineView } from './components/TimelineView';
+import { Tooltip } from './components/Tooltip';
 import { clearSession, loadSession, saveSession } from './lib/session/storage';
 import { formatScheduleSummary } from './lib/settings/formatScheduleSummary';
 import { isWithinSchedule } from './lib/settings/schedule';
@@ -28,9 +33,21 @@ import { decideScheduleAutoStart } from './lib/settings/scheduleAutoStart';
 import { useSettings } from './lib/settings/useSettings';
 import { hydrateTimeline } from './lib/timeline/storage';
 
-type View = 'idle' | 'active' | 'settings' | 'timeline';
+type View = 'idle' | 'active' | 'settings' | 'timeline' | 'permission';
 
 export type MiniView = 'off' | 'full' | 'face' | 'points';
+
+const isMiniRenderer =
+  typeof window !== 'undefined' && window.location.hash.replace(/^#/, '') === 'mini';
+
+if (typeof window !== 'undefined') {
+  console.log('[renderer] boot', {
+    hash: window.location.hash,
+    isMiniRenderer,
+    hasBridge: Boolean(window.postureApp),
+    hasEnterMini: Boolean(window.postureApp?.enterMini),
+  });
+}
 
 const formatElapsed = (ms: number): string => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -44,14 +61,89 @@ const formatElapsed = (ms: number): string => {
 
 const initialSession = loadSession();
 
+const MiniApp = (): ReactElement => {
+  const { settings, update } = useSettings();
+  const [miniView, setMiniView] = useState<Exclude<MiniView, 'off'>>('full');
+
+  useEffect(() => {
+    void hydrateTimeline();
+  }, []);
+
+  const handleExit = useCallback((): void => {
+    window.postureApp?.exitMini?.();
+  }, []);
+
+  const handlePause = useCallback((): void => {
+    const session = loadSession();
+    if (session.runStartedAt !== null) {
+      saveSession({
+        ...session,
+        isPaused: true,
+        accumulatedMs:
+          session.accumulatedMs + Math.max(0, Date.now() - session.runStartedAt),
+        runStartedAt: null,
+      });
+    }
+    handleExit();
+  }, [handleExit]);
+
+  return (
+    <div className="mini-shell" data-mini-view={miniView}>
+      <header className="mini-shell__chrome">
+        <span className="mini-shell__drag" aria-hidden="true">
+          Postura Trabalho
+        </span>
+        <div className="mini-shell__chrome-actions">
+          <button
+            type="button"
+            className="mini-shell__restore"
+            aria-label="Voltar para a janela principal"
+            title="Voltar para a janela principal"
+            onClick={handleExit}
+          >
+            <PictureInPicture2 size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mini-shell__restore"
+            aria-label="Fechar janela flutuante"
+            title="Fechar janela flutuante"
+            onClick={handleExit}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </header>
+      <div className="mini-shell__body">
+        <PostureCheck
+          settings={settings}
+          onStop={handlePause}
+          onSettingsChange={update}
+          miniView={miniView}
+          onChangeMiniView={(next) => {
+            if (next === 'off') handleExit();
+            else setMiniView(next);
+          }}
+          onExitMini={handleExit}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const App = (): ReactElement => {
+  if (isMiniRenderer) return <MiniApp />;
+  return <MainApp />;
+};
+
+const MainApp = (): ReactElement => {
   const { settings, update } = useSettings();
   const [view, setView] = useState<View>(
     initialSession.checkActive && !initialSession.isPaused ? 'active' : 'idle',
   );
   const [checkActive, setCheckActive] = useState(initialSession.checkActive);
   const [isPaused, setIsPaused] = useState(initialSession.isPaused);
-  const [miniView, setMiniView] = useState<MiniView>('off');
+  const [miniActive, setMiniActive] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(() => {
     const startedAt = initialSession.runStartedAt;
     return startedAt !== null
@@ -64,15 +156,13 @@ export const App = (): ReactElement => {
   const runStartedAtRef = useRef<number | null>(initialSession.runStartedAt);
 
   const exitMini = useCallback((): void => {
-    setMiniView('off');
     window.postureApp?.exitMini?.();
   }, []);
 
-  const enterMini = (next: Exclude<MiniView, 'off'>): void => {
-    setMiniView(next);
-    setView('active');
+  const enterMini = useCallback((): void => {
+    console.log('[renderer] enterMini click → IPC');
     window.postureApp?.enterMini?.();
-  };
+  }, []);
 
   const startCheck = useCallback((): void => {
     accumulatedMsRef.current = 0;
@@ -89,6 +179,14 @@ export const App = (): ReactElement => {
     });
   }, []);
 
+  const requestStart = useCallback((): void => {
+    if (!settings.cameraPermissionGranted) {
+      setView('permission');
+      return;
+    }
+    startCheck();
+  }, [settings.cameraPermissionGranted, startCheck]);
+
   const pauseCheck = useCallback((): void => {
     if (runStartedAtRef.current !== null) {
       accumulatedMsRef.current += Date.now() - runStartedAtRef.current;
@@ -97,14 +195,14 @@ export const App = (): ReactElement => {
     setElapsedMs(accumulatedMsRef.current);
     setIsPaused(true);
     setView('idle');
-    if (miniView !== 'off') exitMini();
+    exitMini();
     saveSession({
       checkActive: true,
       isPaused: true,
       accumulatedMs: accumulatedMsRef.current,
       runStartedAt: null,
     });
-  }, [exitMini, miniView]);
+  }, [exitMini]);
 
   const resumeCheck = useCallback((): void => {
     runStartedAtRef.current = Date.now();
@@ -125,28 +223,38 @@ export const App = (): ReactElement => {
     setIsPaused(false);
     setCheckActive(false);
     setView('idle');
-    if (miniView !== 'off') exitMini();
+    exitMini();
     clearSession();
-  }, [exitMini, miniView]);
+  }, [exitMini]);
 
   useEffect(() => {
     void hydrateTimeline();
   }, []);
 
   useEffect(() => {
+    const off = window.postureApp?.onMiniActive?.((active) => {
+      console.log('[renderer] miniActive →', active);
+      setMiniActive(active);
+    });
+    return () => {
+      off?.();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!previousOnboardingCompleted.current && settings.onboardingCompleted) {
-      startCheck();
+      requestStart();
     }
     previousOnboardingCompleted.current = settings.onboardingCompleted;
-  }, [settings.onboardingCompleted, startCheck]);
+  }, [settings.onboardingCompleted, requestStart]);
 
   useEffect(() => {
     if (autoStartedRef.current) return;
     if (!settings.onboardingCompleted) return;
     if (settings.autoStartMode !== 'on-launch') return;
     autoStartedRef.current = true;
-    startCheck();
-  }, [settings.onboardingCompleted, settings.autoStartMode, startCheck]);
+    requestStart();
+  }, [settings.onboardingCompleted, settings.autoStartMode, requestStart]);
 
   const wasWithinScheduleRef = useRef<boolean | null>(null);
   useEffect(() => {
@@ -164,7 +272,7 @@ export const App = (): ReactElement => {
         isCheckActive: checkActive,
       });
       wasWithinScheduleRef.current = inside;
-      if (decision === 'start') startCheck();
+      if (decision === 'start') requestStart();
     };
 
     evaluate();
@@ -175,7 +283,7 @@ export const App = (): ReactElement => {
     settings.autoStartMode,
     settings.schedule,
     checkActive,
-    startCheck,
+    requestStart,
   ]);
 
   useEffect(() => {
@@ -228,40 +336,6 @@ export const App = (): ReactElement => {
     );
   }
 
-  if (miniView !== 'off' && checkActive && !isPaused) {
-    return (
-      <div className="mini-shell" data-mini-view={miniView}>
-        <header className="mini-shell__chrome">
-          <span className="mini-shell__drag" aria-hidden="true">
-            Postura Trabalho, janela compacta
-          </span>
-          <div className="mini-shell__chrome-actions">
-            <button
-              type="button"
-              className="mini-shell__restore"
-              aria-label="Restaurar janela ao tamanho normal"
-              title="Restaurar janela ao tamanho normal"
-              onClick={exitMini}
-            >
-              <PictureInPicture2 size={16} aria-hidden="true" />
-            </button>
-            <WindowControls />
-          </div>
-        </header>
-        <div className="mini-shell__body">
-          <PostureCheck
-            settings={settings}
-            onStop={pauseCheck}
-            onSettingsChange={update}
-            miniView={miniView}
-            onChangeMiniView={setMiniView}
-            onExitMini={exitMini}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="app-shell">
       <header className="app-bar">
@@ -276,39 +350,47 @@ export const App = (): ReactElement => {
         </button>
         <div className="app-bar__actions">
           {checkActive ? (
-            <button
-              type="button"
-              className={`app-bar__badge app-bar__badge--button${isPaused ? ' app-bar__badge--paused' : ''}`}
-              aria-live="polite"
-              aria-label={
-                isPaused
-                  ? `Análise pausada em ${formatElapsed(elapsedMs)}. Abrir painel`
-                  : `Analisando postura há ${formatElapsed(elapsedMs)}. Voltar à câmera`
-              }
-              title={
+            <Tooltip
+              label={
                 isPaused
                   ? `Análise pausada em ${formatElapsed(elapsedMs)}. Clique para retomar.`
                   : `Analisando postura há ${formatElapsed(elapsedMs)}. Clique para voltar à câmera.`
               }
-              onClick={() => (isPaused ? setView('idle') : setView('active'))}
+              placement="bottom"
             >
-              <span className="app-bar__badge-dot" aria-hidden="true" />
-              <span className="app-bar__badge-label">
-                {isPaused ? 'Análise pausada' : 'Analisando postura'}
-              </span>
-              <span className="app-bar__badge-time">{formatElapsed(elapsedMs)}</span>
-            </button>
+              <button
+                type="button"
+                className={`app-bar__badge app-bar__badge--button${isPaused ? ' app-bar__badge--paused' : ''}`}
+                aria-live="polite"
+                aria-label={
+                  isPaused
+                    ? `Análise pausada em ${formatElapsed(elapsedMs)}. Abrir painel`
+                    : `Analisando postura há ${formatElapsed(elapsedMs)}. Voltar à câmera`
+                }
+                onClick={() => (isPaused ? setView('idle') : setView('active'))}
+              >
+                <span className="app-bar__badge-dot" aria-hidden="true" />
+                <span className="app-bar__badge-label">
+                  {isPaused ? 'Análise pausada' : 'Analisando postura'}
+                </span>
+                <span className="app-bar__badge-time">{formatElapsed(elapsedMs)}</span>
+              </button>
+            </Tooltip>
           ) : null}
           {checkActive && !isPaused ? (
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Modo janela compacta"
-              title="Encolhe a janela e posiciona no canto inferior direito da tela onde o cursor está"
-              onClick={() => enterMini('full')}
+            <Tooltip
+              label="Abrir janela flutuante (PiP) com a câmera"
+              placement="bottom"
             >
-              <PictureInPicture2 size={20} aria-hidden="true" />
-            </button>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Abrir janela flutuante"
+                onClick={enterMini}
+              >
+                <PictureInPicture2 size={20} aria-hidden="true" />
+              </button>
+            </Tooltip>
           ) : null}
           <button
             className="icon-button"
@@ -341,7 +423,7 @@ export const App = (): ReactElement => {
       </header>
 
       <main className={`app-content${view === 'active' ? ' app-content--wide' : ''}`}>
-        {checkActive && !isPaused ? (
+        {checkActive && !isPaused && !miniActive ? (
           <div
             className={`posture-host${view === 'active' ? '' : ' posture-host--background'}`}
             aria-hidden={view !== 'active'}
@@ -352,15 +434,27 @@ export const App = (): ReactElement => {
               onSettingsChange={update}
               miniView="off"
               onChangeMiniView={(next) => {
-                if (next === 'off') {
-                  exitMini();
-                } else {
-                  enterMini(next);
-                }
+                if (next !== 'off') enterMini();
               }}
               onExitMini={exitMini}
             />
           </div>
+        ) : null}
+
+        {miniActive ? (
+          <section className="mini-active-card" aria-live="polite">
+            <h2 className="mini-active-card__title">Janela flutuante ativa</h2>
+            <p className="mini-active-card__copy">
+              A análise está rodando na janela mini. Feche-a para voltar à câmera aqui.
+            </p>
+            <button
+              className="button button--filled"
+              type="button"
+              onClick={exitMini}
+            >
+              Trazer de volta para a janela principal
+            </button>
+          </section>
         ) : null}
 
         {view === 'settings' ? (
@@ -372,6 +466,14 @@ export const App = (): ReactElement => {
           />
         ) : view === 'timeline' ? (
           <TimelineView onClose={() => setView(checkActive && !isPaused ? 'active' : 'idle')} />
+        ) : view === 'permission' ? (
+          <PermissionRequestPanel
+            onGranted={() => {
+              update({ cameraPermissionGranted: true });
+              startCheck();
+            }}
+            onCancel={() => setView('idle')}
+          />
         ) : view === 'idle' ? (
           checkActive ? (
             isPaused ? (
@@ -389,7 +491,7 @@ export const App = (): ReactElement => {
             )
           ) : (
             <IdlePanel
-              onStart={startCheck}
+              onStart={requestStart}
               scheduleSummary={
                 settings.autoStartMode === 'schedule'
                   ? formatScheduleSummary(settings.schedule)
@@ -400,6 +502,95 @@ export const App = (): ReactElement => {
         ) : null}
       </main>
     </div>
+  );
+};
+
+interface PermissionRequestPanelProps {
+  onGranted: () => void;
+  onCancel: () => void;
+}
+
+const permissionErrorCopy = (error: unknown): string => {
+  switch (classifyMediaError(error)) {
+    case 'permission-denied':
+      return 'Permissão negada. Libere o acesso à câmera nas configurações do sistema e tente novamente.';
+    case 'no-camera':
+      return 'Nenhuma webcam encontrada. Conecte uma câmera e tente de novo.';
+    case 'camera-in-use':
+      return 'A webcam está em uso por outro app. Feche-o e tente de novo.';
+    case 'unsupported':
+      return 'Câmera indisponível neste dispositivo.';
+    default:
+      return 'Não foi possível acessar a câmera. Tente novamente.';
+  }
+};
+
+const PermissionRequestPanel = ({
+  onGranted,
+  onCancel,
+}: PermissionRequestPanelProps): ReactElement => {
+  const [status, setStatus] = useState<'idle' | 'requesting' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const requestPermission = useCallback(async (): Promise<void> => {
+    setStatus('requesting');
+    setErrorMessage(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      stream.getTracks().forEach((track) => track.stop());
+      onGranted();
+    } catch (error) {
+      console.warn('[permission] camera request failed', error);
+      setErrorMessage(permissionErrorCopy(error));
+      setStatus('error');
+    }
+  }, [onGranted]);
+
+  return (
+    <section className="idle-card permission-card" aria-live="polite">
+      <header className="idle-card__header">
+        <div className="permission-card__icon" aria-hidden="true">
+          <Camera size={28} />
+        </div>
+        <h2 className="idle-card__title">Permitir acesso à câmera</h2>
+        <p className="idle-card__copy">
+          A análise de postura precisa ler a imagem da webcam. As imagens não saem deste
+          computador, só os pontos do corpo são usados.
+        </p>
+      </header>
+
+      {status === 'error' && errorMessage ? (
+        <p className="permission-card__error" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <div className="idle-card__cta-stack">
+        <button
+          className="button button--filled idle-card__cta"
+          type="button"
+          onClick={() => void requestPermission()}
+          disabled={status === 'requesting'}
+        >
+          <ShieldCheck size={18} aria-hidden="true" />
+          {status === 'requesting' ? 'Solicitando…' : 'Permitir câmera e iniciar'}
+        </button>
+        <button className="button button--text" type="button" onClick={onCancel}>
+          Agora não
+        </button>
+      </div>
+
+      <ul className="idle-card__features" role="list">
+        <li className="feature-item">
+          <Lock size={16} aria-hidden="true" />
+          <span>Imagens nunca saem do PC</span>
+        </li>
+        <li className="feature-item">
+          <Shield size={16} aria-hidden="true" />
+          <span>Só pontos do corpo são lidos</span>
+        </li>
+      </ul>
+    </section>
   );
 };
 

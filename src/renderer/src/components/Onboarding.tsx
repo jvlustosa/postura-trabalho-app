@@ -35,12 +35,14 @@ export const Onboarding = ({
   const isLast = step === 'calibrate';
 
   const finish = (data: CalibrationData | null): void => {
-    onComplete({
+    const patch: Partial<AppSettings> = {
       sensitivity,
       screenHeight,
       calibration: data,
       onboardingCompleted: true,
-    });
+    };
+    if (data !== null) patch.cameraPermissionGranted = true;
+    onComplete(patch);
   };
 
   const goNext = (): void => {

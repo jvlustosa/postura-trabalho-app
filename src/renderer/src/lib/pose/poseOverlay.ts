@@ -92,11 +92,11 @@ export const drawPoseOverlay = (
   const points = getVisiblePosePoints(landmarks, viewport);
   const pointByIndex = new Map(points.map((point) => [point.index, point]));
 
-  context.lineWidth = 2.5;
+  context.lineWidth = 1.5;
   context.lineCap = 'round';
-  context.strokeStyle = 'rgba(76, 218, 218, 0.85)';
-  context.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  context.shadowBlur = 4;
+  context.strokeStyle = 'rgba(180, 240, 240, 0.42)';
+  context.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  context.shadowBlur = 2;
 
   for (const [fromIndex, toIndex] of poseConnections) {
     const from = pointByIndex.get(fromIndex);
@@ -116,11 +116,11 @@ export const drawPoseOverlay = (
 
   for (const point of points) {
     context.beginPath();
-    context.arc(point.x, point.y, 4, 0, Math.PI * 2);
-    context.fillStyle = '#ffffff';
+    context.arc(point.x, point.y, 2.5, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(255, 255, 255, 0.78)';
     context.fill();
-    context.lineWidth = 2;
-    context.strokeStyle = 'rgba(0, 106, 106, 0.9)';
+    context.lineWidth = 1;
+    context.strokeStyle = 'rgba(76, 218, 218, 0.45)';
     context.stroke();
   }
 };

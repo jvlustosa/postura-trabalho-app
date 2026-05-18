@@ -114,6 +114,22 @@ describe('createPostureWatcher', () => {
     expect(onAlert).not.toHaveBeenCalled();
   });
 
+  it('clears pending alert state when user steps away from the camera', () => {
+    const { watcher, onAlert, onClear } = makeWatcher({ warningMs: 1_000, cooldownMs: 0 });
+
+    watcher.observe('warning', ['head-forward'], 0);
+    watcher.observe('warning', ['head-forward'], 1_500);
+    expect(onAlert).toHaveBeenCalledTimes(1);
+
+    watcher.observe('away', [], 2_000);
+    expect(onClear).toHaveBeenCalledTimes(1);
+
+    // While away, no new alerts may fire even with sustained bad/warning frames in between
+    watcher.observe('away', [], 5_000);
+    watcher.observe('away', [], 8_000);
+    expect(onAlert).toHaveBeenCalledTimes(1);
+  });
+
   it('reset clears all state', () => {
     const { watcher, onAlert, onClear } = makeWatcher({ warningMs: 1_000, cooldownMs: 0 });
 

@@ -3,17 +3,33 @@ import {
   type ReactElement,
   type ReactNode,
   type SVGProps,
+  useEffect,
+  useState,
 } from 'react';
-import { Activity, Bell, Camera, CalendarClock, Clock, Focus, Settings2 } from 'lucide-react';
+import {
+  Activity,
+  Bell,
+  Camera,
+  CalendarClock,
+  Clock,
+  Download,
+  Focus,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
 
 import { ScreenHeightPicker } from './ScreenHeightPicker';
 import { useConfirm } from './ConfirmDialog';
 import { playAlertTone } from '../lib/alerts/playAlertTone';
+import { clearTimeline, hydrateTimeline, loadTimeline } from '../lib/timeline/storage';
+import { downloadTimelineCsv } from '../lib/timeline/exportCsv';
 import type {
   AlertThresholdSeconds,
   AppSettings,
   AutoStartMode,
+  CameraMode,
   SensitivityLevel,
+  SharedCheckIntervalSeconds,
   Weekday,
 } from '../lib/settings/types';
 
@@ -43,6 +59,16 @@ const autoStartLabels: Record<AutoStartMode, string> = {
   schedule: 'Agendado',
 };
 
+const cameraModeLabels: Record<CameraMode, string> = {
+  continuous: 'Contínuo',
+  shared: 'Compartilhado',
+};
+
+const sharedIntervalOptions: SharedCheckIntervalSeconds[] = [20, 30, 60, 120];
+
+const formatSharedInterval = (seconds: SharedCheckIntervalSeconds): string =>
+  seconds >= 60 ? `${seconds / 60} min` : `${seconds}s`;
+
 const weekdayLabels: Record<Weekday, string> = {
   0: 'Dom',
   1: 'Seg',
@@ -62,6 +88,18 @@ export const SettingsPanel = ({
   onResetOnboarding,
 }: SettingsPanelProps): ReactElement => {
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const [hasHistory, setHasHistory] = useState<boolean>(() => loadTimeline().length > 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateTimeline().then((segments) => {
+      if (cancelled) return;
+      setHasHistory(segments.length > 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleClearCalibration = async (): Promise<void> => {
     const ok = await confirm({
@@ -81,6 +119,25 @@ export const SettingsPanel = ({
       destructive: true,
     });
     if (ok) onResetOnboarding();
+  };
+
+  const handleClearHistory = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Limpar histórico?',
+      message: 'Todo o histórico de postura registrado será apagado e essa ação não pode ser desfeita.',
+      confirmLabel: 'Apagar tudo',
+      destructive: true,
+    });
+    if (ok) {
+      clearTimeline();
+      setHasHistory(false);
+    }
+  };
+
+  const handleExportCsv = async (): Promise<void> => {
+    const segments = await hydrateTimeline();
+    if (segments.length === 0) return;
+    downloadTimelineCsv(segments);
   };
 
   const toggleWeekday = (day: Weekday): void => {
@@ -364,7 +421,65 @@ export const SettingsPanel = ({
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={Camera} title="Câmera" hint="Aparência da imagem ao vivo.">
+      <SettingsSection icon={Camera} title="Câmera" hint="Como o app usa a webcam.">
+        <div className="settings-group" role="group" aria-label="Modo de uso da câmera">
+          <div className="settings-group__head">
+            <span className="settings-group__label">Modo de uso</span>
+            <span className="settings-group__hint">
+              Contínuo mantém a câmera ligada. Compartilhado libera a câmera entre leituras para
+              videoconferências e outros apps usarem.
+            </span>
+          </div>
+          <div className="segmented" role="radiogroup">
+            {(Object.keys(cameraModeLabels) as CameraMode[]).map((mode) => {
+              const isSelected = settings.cameraMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
+                  onClick={() => onChange({ cameraMode: mode })}
+                >
+                  {cameraModeLabels[mode]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          className={`settings-group${settings.cameraMode === 'shared' ? '' : ' settings-group--disabled'}`}
+          role="group"
+          aria-label="Intervalo entre leituras"
+        >
+          <div className="settings-group__head">
+            <span className="settings-group__label">Intervalo entre leituras</span>
+            <span className="settings-group__hint">
+              Tempo que a câmera fica livre entre cada verificação rápida de postura.
+            </span>
+          </div>
+          <div className="segmented" role="radiogroup">
+            {sharedIntervalOptions.map((seconds) => {
+              const isSelected = settings.sharedCheckIntervalSeconds === seconds;
+              return (
+                <button
+                  key={seconds}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  disabled={settings.cameraMode !== 'shared'}
+                  className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
+                  onClick={() => onChange({ sharedCheckIntervalSeconds: seconds })}
+                >
+                  {formatSharedInterval(seconds)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <ToggleRow
           label="Espelhar vídeo"
           hint="Mostra a imagem invertida como se fosse um espelho."
@@ -444,6 +559,31 @@ export const SettingsPanel = ({
           </button>
         </div>
       </SettingsSection>
+
+      <div className="settings-card__footer">
+        <button
+          className="settings-subtle-link"
+          type="button"
+          onClick={() => {
+            void handleExportCsv();
+          }}
+          disabled={!hasHistory}
+        >
+          <Download size={14} aria-hidden="true" />
+          Exportar histórico em CSV
+        </button>
+        <button
+          className="settings-danger-link"
+          type="button"
+          onClick={() => {
+            void handleClearHistory();
+          }}
+          disabled={!hasHistory}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          Apagar histórico de postura
+        </button>
+      </div>
 
       {confirmDialog}
     </section>

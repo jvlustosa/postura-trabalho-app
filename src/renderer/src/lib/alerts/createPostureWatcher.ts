@@ -59,7 +59,13 @@ export const createPostureWatcher = (options: CreatePostureWatcherOptions): Post
 
   return {
     observe(state, reasons, now = Date.now()): void {
-      if (state === 'calibrating' || state === 'inactive') {
+      if (
+        state === 'calibrating' ||
+        state === 'inactive' ||
+        state === 'away' ||
+        state === 'camera-error' ||
+        state === 'model-error'
+      ) {
         clear();
         return;
       }

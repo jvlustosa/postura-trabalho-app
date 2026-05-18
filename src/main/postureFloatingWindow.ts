@@ -6,10 +6,10 @@ export interface FloatingState {
   score: number;
 }
 
-const FLOATING_WIDTH = 172;
-const FLOATING_HEIGHT = 44;
+const FLOATING_WIDTH = 252;
+const FLOATING_HEIGHT = 60;
 const FLOATING_MARGIN = 16;
-const DEFAULT_OPACITY = 0.85;
+const DEFAULT_OPACITY = 0.92;
 
 let floatingWindow: BrowserWindow | null = null;
 let currentOpacity = DEFAULT_OPACITY;
@@ -21,7 +21,14 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
     <title>Postura</title>
     <style>
-      :root { color-scheme: dark; --pill-opacity: ${initialOpacity}; }
+      :root {
+        color-scheme: dark;
+        --card-opacity: ${initialOpacity};
+        --state-color: #9aa0a6;
+        --state-tint: rgba(154, 160, 166, 0.18);
+        --card-bg: rgba(14, 16, 20, 0.88);
+      }
+      *, *::before, *::after { box-sizing: border-box; }
       html, body {
         margin: 0;
         height: 100%;
@@ -30,101 +37,213 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
         color: #f7fafa;
         -webkit-user-select: none;
         user-select: none;
-        cursor: pointer;
         overflow: hidden;
       }
       body {
         display: flex;
         align-items: center;
+        justify-content: center;
         padding: 6px;
       }
-      .pill {
-        flex: 1;
-        height: 100%;
+      .card {
+        position: relative;
         display: grid;
-        grid-template-columns: 14px 1fr auto auto;
+        grid-template-columns: 38px 1fr auto;
         align-items: center;
         gap: 10px;
-        padding: 0 14px;
-        border-radius: 9999px;
-        background: rgba(10, 12, 16, 0.82);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        transition: background 220ms ease, transform 160ms ease, opacity 160ms ease;
-        opacity: var(--pill-opacity, 0.85);
+        width: 100%;
+        height: 100%;
+        padding: 0 6px 0 8px;
+        border: 0;
+        border-radius: 999px;
+        font-family: inherit;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+        background: var(--card-bg);
+        box-shadow:
+          0 12px 28px rgba(0, 0, 0, 0.45),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        opacity: var(--card-opacity, 0.92);
+        transition:
+          background 220ms ease,
+          transform 160ms ease,
+          opacity 160ms ease,
+          box-shadow 220ms ease;
       }
-      .pill:hover { opacity: 1; transform: translateY(-1px); }
-      .pill:active { transform: translateY(0); }
-      .expand {
-        font-size: 12px;
+      .card:hover {
+        opacity: 1;
+        transform: translateY(-1px);
+        box-shadow:
+          0 18px 38px rgba(0, 0, 0, 0.55),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+      }
+      .card:active { transform: translateY(0); }
+      .card:focus { outline: none; }
+      .card__indicator {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--state-tint);
+        flex-shrink: 0;
+      }
+      .card__dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--state-color);
+        box-shadow: 0 0 12px var(--state-color);
+      }
+      .card__info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        line-height: 1.1;
+      }
+      .card__label {
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .card__meta {
+        font-size: 10.5px;
+        font-weight: 500;
+        opacity: 0.6;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .card__action {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 10.5px;
         font-weight: 700;
-        opacity: 0;
-        transform: translateX(-4px);
-        transition: opacity 160ms ease, transform 160ms ease;
-        line-height: 1;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.92);
+        transition: background 160ms ease, color 160ms ease;
       }
-      .pill:hover .expand { opacity: 0.7; transform: translateX(0); }
+      .card:hover .card__action {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+      }
+      .card__action-icon {
+        font-size: 13px;
+        line-height: 1;
+        transform: translate(0, -1px);
+      }
+      .card[data-state="good"] {
+        --state-color: #5ee27a;
+        --state-tint: rgba(94, 226, 122, 0.18);
+        --card-bg: rgba(18, 50, 32, 0.88);
+      }
+      .card[data-state="warning"] {
+        --state-color: #ffc857;
+        --state-tint: rgba(255, 200, 87, 0.20);
+        --card-bg: rgba(70, 50, 14, 0.88);
+      }
+      .card[data-state="bad"] {
+        --state-color: #ff6b78;
+        --state-tint: rgba(255, 107, 120, 0.22);
+        --card-bg: rgba(82, 14, 22, 0.90);
+      }
+      .card[data-state="away"] {
+        --state-color: #9bb5e6;
+        --state-tint: rgba(155, 181, 230, 0.22);
+        --card-bg: rgba(22, 32, 56, 0.92);
+      }
+      .card[data-state="calibrating"] .card__dot,
+      .card[data-state="away"] .card__dot {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.45; transform: scale(0.85); }
+        50% { opacity: 1; transform: scale(1.05); }
+      }
       .drag {
         position: absolute;
         inset: 0;
         -webkit-app-region: drag;
         pointer-events: none;
       }
-      .dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #8a8f95;
-        box-shadow: 0 0 8px currentColor;
+      .tooltip {
+        position: fixed;
+        left: 50%;
+        bottom: calc(100% + 6px);
+        transform: translateX(-50%) translateY(4px);
+        max-width: 220px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: rgba(20, 22, 26, 0.96);
+        color: #f7fafa;
+        font-size: 11.5px;
+        line-height: 1.35;
+        font-weight: 500;
+        white-space: normal;
+        text-align: center;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 120ms ease, transform 120ms ease;
+        z-index: 10;
       }
-      .label {
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .score {
-        font-size: 13px;
-        font-variant-numeric: tabular-nums;
-        font-weight: 700;
-        opacity: 0.92;
-      }
-      .pill[data-state="good"] { background: rgba(20, 58, 36, 0.86); }
-      .pill[data-state="good"] .dot { background: #5ee27a; color: #5ee27a; }
-      .pill[data-state="warning"] { background: rgba(80, 55, 12, 0.88); }
-      .pill[data-state="warning"] .dot { background: #ffc857; color: #ffc857; }
-      .pill[data-state="bad"] { background: rgba(96, 12, 18, 0.92); }
-      .pill[data-state="bad"] .dot { background: #ff6b78; color: #ff6b78; }
-      .pill[data-state="calibrating"] .dot,
-      .pill[data-state="inactive"] .dot,
-      .pill[data-state="camera-error"] .dot,
-      .pill[data-state="model-error"] .dot {
-        background: #9aa0a6;
-        color: #9aa0a6;
-      }
-      .pill[data-state="calibrating"] .dot { animation: pulse 1.2s ease-in-out infinite; }
-      @keyframes pulse {
-        0%, 100% { opacity: 0.4; }
-        50% { opacity: 1; }
+      .tooltip[data-visible="true"] {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
       }
     </style>
   </head>
   <body>
-    <div class="pill" id="pill" data-state="calibrating" title="Clique para abrir o app • Botão direito para mais opções">
-      <span class="dot" aria-hidden="true"></span>
-      <span class="label" id="label">Calibrando</span>
-      <span class="score" id="score">-</span>
-      <span class="expand" aria-hidden="true">⤢</span>
+    <div
+      class="card"
+      id="card"
+      data-state="calibrating"
+      role="button"
+      tabindex="0"
+      aria-describedby="tooltip"
+    >
+      <span class="card__indicator" aria-hidden="true">
+        <span class="card__dot"></span>
+      </span>
+      <span class="card__info">
+        <span class="card__label" id="label">Calibrando</span>
+        <span class="card__meta" id="meta">aguarde…</span>
+      </span>
+      <span class="card__action" aria-hidden="true">
+        <span class="card__action-text">Abrir</span>
+        <span class="card__action-icon">↗</span>
+      </span>
+      <span class="tooltip" id="tooltip" role="tooltip">Clique para abrir o app · Botão direito para mais opções</span>
     </div>
     <div class="drag" aria-hidden="true"></div>
     <script>
+      var SCORE_STATES = ['good', 'warning', 'bad'];
+      var META_FALLBACK = {
+        calibrating: 'aguarde…',
+        inactive: 'monitor pausado',
+        away: 'sem você na câmera',
+        'camera-error': 'sem câmera',
+        'model-error': 'erro no modelo',
+      };
       window.__setFloatingOpacity = function (opacity) {
         try {
           if (typeof opacity === 'number' && isFinite(opacity)) {
-            document.documentElement.style.setProperty('--pill-opacity', String(opacity));
+            document.documentElement.style.setProperty('--card-opacity', String(opacity));
           }
         } catch (error) {
           // ignore
@@ -132,32 +251,68 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
       };
       window.__setFloating = function (payload) {
         try {
-          var pill = document.getElementById('pill');
+          var card = document.getElementById('card');
           var label = document.getElementById('label');
-          var score = document.getElementById('score');
-          if (!pill || !label || !score) return;
-          if (payload && typeof payload === 'object') {
-            if (typeof payload.state === 'string') pill.setAttribute('data-state', payload.state);
-            if (typeof payload.label === 'string') label.textContent = payload.label;
-            if (typeof payload.score === 'number' && isFinite(payload.score)) {
-              score.textContent = Math.round(payload.score) + '';
-            } else {
-              score.textContent = '-';
-            }
+          var meta = document.getElementById('meta');
+          if (!card || !label || !meta) return;
+          if (!payload || typeof payload !== 'object') return;
+          if (typeof payload.state === 'string') card.setAttribute('data-state', payload.state);
+          if (typeof payload.label === 'string') label.textContent = payload.label;
+          var state = card.getAttribute('data-state');
+          var hasScore = SCORE_STATES.indexOf(state) !== -1;
+          if (hasScore && typeof payload.score === 'number' && isFinite(payload.score)) {
+            meta.textContent = Math.round(payload.score) + ' pts';
+          } else {
+            meta.textContent = META_FALLBACK[state] || '';
           }
         } catch (error) {
           // ignore
         }
       };
-      var pill = document.getElementById('pill');
-      if (pill) {
-        pill.addEventListener('click', function () {
+      var card = document.getElementById('card');
+      var tooltip = document.getElementById('tooltip');
+      var tooltipTimer = null;
+      var TOOLTIP_DELAY = 650;
+      var showTooltip = function () {
+        if (!tooltip) return;
+        if (tooltipTimer !== null) window.clearTimeout(tooltipTimer);
+        tooltipTimer = window.setTimeout(function () {
+          if (tooltip) tooltip.setAttribute('data-visible', 'true');
+          tooltipTimer = null;
+        }, TOOLTIP_DELAY);
+      };
+      var hideTooltip = function () {
+        if (tooltipTimer !== null) {
+          window.clearTimeout(tooltipTimer);
+          tooltipTimer = null;
+        }
+        if (tooltip) tooltip.removeAttribute('data-visible');
+      };
+      if (card) {
+        card.addEventListener('mouseenter', showTooltip);
+        card.addEventListener('mouseleave', hideTooltip);
+        card.addEventListener('focus', showTooltip);
+        card.addEventListener('blur', hideTooltip);
+        card.addEventListener('click', function () {
+          hideTooltip();
           if (window.postureApp && window.postureApp.restoreFromFloating) {
             window.postureApp.restoreFromFloating();
           }
         });
-        pill.addEventListener('contextmenu', function (event) {
+        card.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            hideTooltip();
+            if (window.postureApp && window.postureApp.restoreFromFloating) {
+              window.postureApp.restoreFromFloating();
+            }
+          } else if (event.key === 'Escape') {
+            hideTooltip();
+          }
+        });
+        card.addEventListener('contextmenu', function (event) {
           event.preventDefault();
+          hideTooltip();
           if (window.postureApp && window.postureApp.openFloatingMenu) {
             window.postureApp.openFloatingMenu();
           }

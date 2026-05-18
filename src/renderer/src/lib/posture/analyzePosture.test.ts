@@ -30,6 +30,9 @@ const calibrated = (overrides: Partial<PostureThresholds> = {}): PostureThreshol
   slouchBad: 0.78,
   headDownWarning: 0.88,
   headDownBad: 0.72,
+  hunchSignificantDeficit: 0.03,
+  hunchCompositeWarning: 0.04,
+  hunchCompositeBad: 0.075,
   ...overrides,
 });
 
@@ -198,5 +201,79 @@ describe('analyzePosture', () => {
     const result = analyzePosture(landmarks);
     expect(result.reasons.length).toBeGreaterThanOrEqual(2);
     expect(result.score).toBeLessThan(70);
+  });
+
+  it('triggers composite hunch with only 2 signals (hips not visible)', () => {
+    // Desk user scenario: hips outside frame, only shoulder narrowing and
+    // head dropping available. Composite must still detect subtle hunching.
+    // Width narrows ~5%, head drop ~5% — average 5% (above 4% warning).
+    const landmarks = baseLandmarks()
+      .filter((l) => l.name !== 'leftHip' && l.name !== 'rightHip')
+      .map((l) => {
+        if (l.name === 'leftShoulder') return { ...l, x: 0.3955 };
+        if (l.name === 'rightShoulder') return { ...l, x: 0.6045 };
+        if (l.name === 'nose') return { ...l, y: 0.215 };
+        if (l.name === 'leftEar' || l.name === 'rightEar') return { ...l, y: 0.235 };
+        return l;
+      });
+    const result = analyzePosture(landmarks, calibrated());
+    expect(result.reasons).toContain('slouch');
+  });
+
+  it('does not change composite trigger threshold when number of signals changes', () => {
+    // With AVERAGE deficit logic, behavior with 2 vs 3 signals should be
+    // consistent at the same per-signal deficit level. ~5% deficit on every
+    // available axis should trigger warning regardless of hip visibility.
+    const buildLandmarks = (withHips: boolean) => {
+      const base = baseLandmarks().map((l) => {
+        if (l.name === 'leftShoulder') return { ...l, x: 0.3955 };
+        if (l.name === 'rightShoulder') return { ...l, x: 0.6045 };
+        if (l.name === 'nose') return { ...l, y: 0.215 };
+        if (l.name === 'leftEar' || l.name === 'rightEar') return { ...l, y: 0.235 };
+        if (withHips && (l.name === 'leftHip' || l.name === 'rightHip')) {
+          return { ...l, y: 0.691 };
+        }
+        return l;
+      });
+      return withHips ? base : base.filter((l) => l.name !== 'leftHip' && l.name !== 'rightHip');
+    };
+    const withHips = analyzePosture(buildLandmarks(true), calibrated());
+    const withoutHips = analyzePosture(buildLandmarks(false), calibrated());
+    expect(withHips.reasons).toContain('slouch');
+    expect(withoutHips.reasons).toContain('slouch');
+  });
+
+  it('composite thresholds respond to stricter sensitivity', () => {
+    // Width deficit ~2.3% (below default significant=3%, above strict=2.2%).
+    // Should NOT trigger composite at standard sensitivity (only 1 axis
+    // qualifies). Should trigger at strict sensitivity (2 axes qualify).
+    const landmarks = baseLandmarks()
+      .filter((l) => l.name !== 'leftHip' && l.name !== 'rightHip')
+      .map((l) => {
+        if (l.name === 'leftShoulder') return { ...l, x: 0.3925 };
+        if (l.name === 'rightShoulder') return { ...l, x: 0.6075 };
+        return l;
+      });
+    const standard = analyzePosture(landmarks, calibrated());
+    const strict = analyzePosture(
+      landmarks,
+      calibrated({ hunchCompositeWarning: 0.03, hunchSignificantDeficit: 0.022 }),
+    );
+    expect(standard.reasons).not.toContain('slouch');
+    expect(strict.reasons).toContain('slouch');
+  });
+
+  it('keeps score in good range when metrics are slightly elevated but below thresholds', () => {
+    // Small head offset (0.05) and shoulder tilt (0.03), both below warning.
+    // No reasons fired. Score should remain >= 92 (micro penalty capped).
+    const landmarks = baseLandmarks().map((l) => {
+      if (l.name === 'nose') return { ...l, x: 0.55 };
+      if (l.name === 'rightShoulder') return { ...l, y: 0.45 };
+      return l;
+    });
+    const result = analyzePosture(landmarks);
+    expect(result.state).toBe('good');
+    expect(result.reasons).toHaveLength(0);
+    expect(result.score).toBeGreaterThanOrEqual(92);
   });
 });

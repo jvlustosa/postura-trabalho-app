@@ -6,8 +6,10 @@ import {
   type AppSettings,
   type AutoStartMode,
   type CalibrationData,
+  type CameraMode,
   type ScheduleConfig,
   type SensitivityLevel,
+  type SharedCheckIntervalSeconds,
   type Weekday,
 } from './types';
 
@@ -18,6 +20,8 @@ const calibrationValues: readonly AppSettings['calibrationSeconds'][] = [3, 5, 8
 const alertThresholdValues: readonly AlertThresholdSeconds[] = [30, 60, 120, 180];
 const autoStartModeValues: readonly AutoStartMode[] = ['off', 'on-launch', 'schedule'];
 const weekdayValues: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+const cameraModeValues: readonly CameraMode[] = ['continuous', 'shared'];
+const sharedIntervalValues: readonly SharedCheckIntervalSeconds[] = [20, 30, 60, 120];
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -86,6 +90,13 @@ const parseThresholds = (raw: unknown): PostureThresholds | null => {
     slouchBad: isFiniteNumber(c.slouchBad) ? c.slouchBad : 0.84,
     headDownWarning: isFiniteNumber(c.headDownWarning) ? c.headDownWarning : 0.92,
     headDownBad: isFiniteNumber(c.headDownBad) ? c.headDownBad : 0.82,
+    hunchSignificantDeficit: isFiniteNumber(c.hunchSignificantDeficit)
+      ? c.hunchSignificantDeficit
+      : 0.03,
+    hunchCompositeWarning: isFiniteNumber(c.hunchCompositeWarning)
+      ? c.hunchCompositeWarning
+      : 0.04,
+    hunchCompositeBad: isFiniteNumber(c.hunchCompositeBad) ? c.hunchCompositeBad : 0.075,
   };
 };
 
@@ -145,6 +156,10 @@ const parseSettings = (raw: unknown): AppSettings => {
       typeof c.onboardingCompleted === 'boolean'
         ? c.onboardingCompleted
         : defaultSettings.onboardingCompleted,
+    cameraPermissionGranted:
+      typeof c.cameraPermissionGranted === 'boolean'
+        ? c.cameraPermissionGranted
+        : defaultSettings.cameraPermissionGranted,
     screenHeight:
       isFiniteNumber(c.screenHeight)
         ? Math.min(100, Math.max(0, Math.round(c.screenHeight)))
@@ -168,6 +183,14 @@ const parseSettings = (raw: unknown): AppSettings => {
       typeof c.compactMode === 'boolean' ? c.compactMode : defaultSettings.compactMode,
     autoStartMode: resolveAutoStartMode(c),
     schedule: parseSchedule(c.schedule),
+    cameraMode: cameraModeValues.includes(c.cameraMode as CameraMode)
+      ? (c.cameraMode as CameraMode)
+      : defaultSettings.cameraMode,
+    sharedCheckIntervalSeconds: sharedIntervalValues.includes(
+      c.sharedCheckIntervalSeconds as SharedCheckIntervalSeconds,
+    )
+      ? (c.sharedCheckIntervalSeconds as SharedCheckIntervalSeconds)
+      : defaultSettings.sharedCheckIntervalSeconds,
   };
 };
 

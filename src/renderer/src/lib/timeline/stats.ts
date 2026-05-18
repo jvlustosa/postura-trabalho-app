@@ -45,24 +45,29 @@ export const computeCurrentStreak = (
   return last.endedAt - last.startedAt;
 };
 
-export interface SparklinePoint {
+export interface TimelineBucket {
   bucketStart: number;
   bucketEnd: number;
-  goodRatio: number;
+  bucketMs: number;
+  goodMs: number;
+  warningMs: number;
+  badMs: number;
   monitoredMs: number;
+  goodRatio: number;
 }
 
-export const computeSparkline = (
+export const computeTimelineBuckets = (
   segments: readonly ClippedSegment[],
   rangeStart: number,
   rangeEnd: number,
   bucketCount: number,
-): SparklinePoint[] => {
+): TimelineBucket[] => {
   const totalRange = rangeEnd - rangeStart;
   if (totalRange <= 0 || bucketCount <= 0) return [];
   const bucketMs = totalRange / bucketCount;
   const goodTime = new Array<number>(bucketCount).fill(0);
-  const monitoredTime = new Array<number>(bucketCount).fill(0);
+  const warningTime = new Array<number>(bucketCount).fill(0);
+  const badTime = new Array<number>(bucketCount).fill(0);
 
   for (const segment of segments) {
     let cursor = segment.startedAt;
@@ -73,23 +78,34 @@ export const computeSparkline = (
       const sliceEnd = Math.min(bucketEnd, segment.endedAt);
       const sliceDuration = sliceEnd - cursor;
       if (sliceDuration <= 0) break;
-      monitoredTime[idx] += sliceDuration;
-      if (segment.state === 'good') {
-        goodTime[idx] += sliceDuration;
-      }
+      if (segment.state === 'good') goodTime[idx] += sliceDuration;
+      else if (segment.state === 'warning') warningTime[idx] += sliceDuration;
+      else badTime[idx] += sliceDuration;
       cursor = sliceEnd;
     }
   }
 
-  const points: SparklinePoint[] = [];
+  const buckets: TimelineBucket[] = [];
   for (let i = 0; i < bucketCount; i += 1) {
     const bucketStart = rangeStart + i * bucketMs;
     const bucketEnd = bucketStart + bucketMs;
-    const monitoredMs = monitoredTime[i];
-    const goodRatio = monitoredMs > 0 ? goodTime[i] / monitoredMs : 0;
-    points.push({ bucketStart, bucketEnd, goodRatio, monitoredMs });
+    const goodMs = goodTime[i];
+    const warningMs = warningTime[i];
+    const badMs = badTime[i];
+    const monitoredMs = goodMs + warningMs + badMs;
+    const goodRatio = monitoredMs > 0 ? goodMs / monitoredMs : 0;
+    buckets.push({
+      bucketStart,
+      bucketEnd,
+      bucketMs,
+      goodMs,
+      warningMs,
+      badMs,
+      monitoredMs,
+      goodRatio,
+    });
   }
-  return points;
+  return buckets;
 };
 
 export interface Totals {

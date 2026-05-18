@@ -1,9 +1,10 @@
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Crosshair, Flame, Maximize2, PictureInPicture2, RotateCcw, Sparkles } from 'lucide-react';
+import { Camera, EyeOff, Flame, Maximize2, Pause, PictureInPicture2, RotateCcw, UserX } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
 import type { MiniView } from '../App';
-import { type AlertLevel, createPostureWatcher } from '../lib/alerts/createPostureWatcher';
+import { buildAlertMessage, reasonMessages } from '../lib/alerts/buildAlertMessage';
+import { createPostureWatcher } from '../lib/alerts/createPostureWatcher';
 import { playAlertTone } from '../lib/alerts/playAlertTone';
 import { buildCameraDiagnosticReport } from '../lib/media/buildCameraDiagnosticReport';
 import { classifyMediaError, formatMediaErrorDetails } from '../lib/media/classifyMediaError';
@@ -14,10 +15,11 @@ import { analyzePosture } from '../lib/posture/analyzePosture';
 import { createLandmarkSmoother } from '../lib/posture/createLandmarkSmoother';
 import { createPersonalizedThresholds } from '../lib/posture/createPersonalizedThresholds';
 import { createPostureSmoother } from '../lib/posture/createPostureSmoother';
-import type { PostureAnalysis, PostureReason, PostureState, PostureThresholds } from '../lib/posture/types';
+import type { PostureAnalysis, PostureState, PostureThresholds } from '../lib/posture/types';
 import { sensitivityMultiplier } from '../lib/settings/sensitivityMultiplier';
 import type { AppSettings, CalibrationData } from '../lib/settings/types';
 import { createTimelineRecorder } from '../lib/timeline/createTimelineRecorder';
+import { Tooltip } from './Tooltip';
 
 interface PostureCheckProps {
   onStop: () => void;
@@ -55,6 +57,9 @@ const scaleThresholds = (thresholds: PostureThresholds, multiplier: number): Pos
   slouchBad: clamp01(1 - (1 - thresholds.slouchBad) * multiplier),
   headDownWarning: clamp01(1 - (1 - thresholds.headDownWarning) * multiplier),
   headDownBad: clamp01(1 - (1 - thresholds.headDownBad) * multiplier),
+  hunchSignificantDeficit: thresholds.hunchSignificantDeficit * multiplier,
+  hunchCompositeWarning: thresholds.hunchCompositeWarning * multiplier,
+  hunchCompositeBad: thresholds.hunchCompositeBad * multiplier,
 });
 
 const isUprightSample = (metrics: PostureAnalysis['metrics']): boolean =>
@@ -75,20 +80,19 @@ const statusLabels: Record<PostureState, string> = {
   good: 'Postura ok',
   warning: 'Ajuste leve',
   bad: 'Corrija postura',
+  away: 'Fora da tela',
   'camera-error': 'Sem câmera',
   'model-error': 'Erro no modelo',
 };
 
-const reasonMessages: Record<PostureReason, { warning: string; bad: string }> = {
-  'low-confidence': { warning: 'Enquadre melhor cabeça e ombros.', bad: 'Enquadre melhor cabeça e ombros.' },
-  'head-forward': { warning: 'Sua cabeça está um pouco à frente. Recue levemente.', bad: 'Sua cabeça está muito projetada à frente. Reajuste agora.' },
-  'shoulder-tilt': { warning: 'Seus ombros estão levemente desnivelados.', bad: 'Seus ombros estão muito desnivelados. Nivele-os.' },
-  'neck-tilt': { warning: 'Pescoço levemente inclinado. Alinhe a cabeça.', bad: 'Seu pescoço está muito inclinado. Corrija a posição.' },
-  slouch: { warning: 'Você está curvando levemente as costas. Endireite-se.', bad: 'Suas costas estão muito curvadas. Sente-se ereto agora.' },
-  'head-down': { warning: 'Sua cabeça está caindo um pouco. Levante o olhar.', bad: 'Sua cabeça está muito baixa. Levante a cabeça.' },
-};
+const AWAY_GRACE_MS = 800;
+const SHARED_SAMPLE_WINDOW_MS = 5_000;
+const SHARED_WARMUP_FRAMES = 4;
+
+type CycleState = 'continuous' | 'warmup' | 'sampling' | 'idle';
 
 const hintFor = (analysis: PostureAnalysis, awaitingUpright: boolean): string | null => {
+  if (analysis.state === 'away') return 'Volte para a câmera quando quiser';
   if (analysis.state === 'calibrating') {
     if (analysis.reasons.includes('low-confidence')) return 'Mostre cabeça e ombros';
     return awaitingUpright ? 'Sente-se ereto para calibrar' : 'Calibrando';
@@ -102,12 +106,6 @@ const hintFor = (analysis: PostureAnalysis, awaitingUpright: boolean): string | 
   return null;
 };
 
-const buildAlertMessage = (level: AlertLevel, reasons: PostureReason[]): string => {
-  const relevant = reasons.filter((r) => r !== 'low-confidence');
-  if (relevant.length === 0) return 'Reajuste sua postura.';
-  return reasonMessages[relevant[0]]?.[level] ?? 'Reajuste sua postura.';
-};
-
 const SCORE_HISTORY_MAX = 60;
 const SCORE_SAMPLE_INTERVAL_MS = 1000;
 
@@ -119,17 +117,47 @@ const formatStreak = (ms: number): string => {
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
-const buildSparklinePoints = (values: readonly number[], width: number, height: number): string => {
-  if (values.length < 2) return '';
-  const step = width / (values.length - 1);
-  return values
-    .map((v, i) => {
-      const clamped = Math.max(0, Math.min(100, v));
-      const x = i * step;
-      const y = height - (clamped / 100) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+interface ScoreSample {
+  score: number;
+  state: PostureState;
+}
+
+interface SparklineSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  state: 'good' | 'warning' | 'bad';
+}
+
+const segmentStateFor = (a: PostureState, b: PostureState): SparklineSegment['state'] => {
+  if (a === 'bad' || b === 'bad') return 'bad';
+  if (a === 'warning' || b === 'warning') return 'warning';
+  return 'good';
+};
+
+const buildSparklineSegments = (
+  samples: readonly ScoreSample[],
+  width: number,
+  height: number,
+): SparklineSegment[] => {
+  if (samples.length < 2) return [];
+  const step = width / (samples.length - 1);
+  const segments: SparklineSegment[] = [];
+  for (let i = 0; i < samples.length - 1; i += 1) {
+    const a = samples[i];
+    const b = samples[i + 1];
+    const ay = height - (Math.max(0, Math.min(100, a.score)) / 100) * height;
+    const by = height - (Math.max(0, Math.min(100, b.score)) / 100) * height;
+    segments.push({
+      x1: i * step,
+      y1: ay,
+      x2: (i + 1) * step,
+      y2: by,
+      state: segmentStateFor(a.state, b.state),
+    });
+  }
+  return segments;
 };
 
 export const PostureCheck = ({
@@ -151,11 +179,6 @@ export const PostureCheck = ({
 
   useEffect(() => {
     miniViewRef.current = miniView;
-    const stage = cameraStageRef.current;
-    if (stage && miniView !== 'face') {
-      stage.style.setProperty('--face-x', '50%');
-      stage.style.setProperty('--face-y', '50%');
-    }
   }, [miniView]);
   const calibrationStartedRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<PostureAnalysis['metrics'][]>([]);
@@ -169,6 +192,17 @@ export const PostureCheck = ({
   const alertsEnabledRef = useRef(settings.alertsEnabled);
   const alertThresholdMsRef = useRef(settings.alertThresholdSeconds * 1_000);
   const alertSoundRef = useRef(settings.alertSound);
+  const cameraModeRef = useRef(settings.cameraMode);
+  const sharedIntervalMsRef = useRef(settings.sharedCheckIntervalSeconds * 1_000);
+
+  const cycleStateRef = useRef<CycleState>(
+    settings.cameraMode === 'shared' ? 'sampling' : 'continuous',
+  );
+  const warmupFramesRef = useRef(0);
+  const sampleStartedAtRef = useRef<number | null>(null);
+  const idleTimeoutRef = useRef<number | null>(null);
+  const idleUntilRef = useRef<number | null>(null);
+  const restartCameraRef = useRef<(() => void) | null>(null);
 
   const smoother = useMemo(() => createPostureSmoother(8), []);
   const landmarkSmoother = useMemo(() => createLandmarkSmoother(0.4), []);
@@ -193,10 +227,11 @@ export const PostureCheck = ({
   );
 
   const streakStartRef = useRef<number | null>(null);
-  const scoreHistoryRef = useRef<number[]>([]);
+  const scoreHistoryRef = useRef<ScoreSample[]>([]);
   const lastScoreSampleRef = useRef(0);
   const lastFloatingPushRef = useRef(0);
   const lastFloatingStateRef = useRef<PostureState | null>(null);
+  const awaySinceRef = useRef<number | null>(null);
 
   const pushFloating = useCallback((state: PostureState, score: number, label?: string): void => {
     const now = performance.now();
@@ -217,8 +252,17 @@ export const PostureCheck = ({
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [copyDiagFeedback, setCopyDiagFeedback] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [streakMs, setStreakMs] = useState(0);
-  const [scoreHistory, setScoreHistory] = useState<number[]>([]);
+  const [scoreHistory, setScoreHistory] = useState<ScoreSample[]>([]);
+  const [sharedIdleUntil, setSharedIdleUntil] = useState<number | null>(null);
+  const [sharedNow, setSharedNow] = useState(() => Date.now());
   const diagnosticCaptureRef = useRef<{ error?: unknown; stream?: MediaStream | null }>({});
+
+  useEffect(() => {
+    if (sharedIdleUntil === null) return;
+    setSharedNow(Date.now());
+    const id = window.setInterval(() => setSharedNow(Date.now()), 1_000);
+    return () => window.clearInterval(id);
+  }, [sharedIdleUntil]);
 
   const copyDetailedLogs = useCallback(async (): Promise<void> => {
     const { error, stream } = diagnosticCaptureRef.current;
@@ -276,6 +320,35 @@ export const PostureCheck = ({
     alertSoundRef.current = settings.alertSound;
   }, [settings.alertSound]);
 
+  useEffect(() => {
+    sharedIntervalMsRef.current = settings.sharedCheckIntervalSeconds * 1_000;
+  }, [settings.sharedCheckIntervalSeconds]);
+
+  useEffect(() => {
+    const prev = cameraModeRef.current;
+    cameraModeRef.current = settings.cameraMode;
+    if (prev === settings.cameraMode) return;
+
+    if (settings.cameraMode === 'continuous') {
+      cycleStateRef.current = 'continuous';
+      warmupFramesRef.current = 0;
+      sampleStartedAtRef.current = null;
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+        idleTimeoutRef.current = null;
+      }
+      idleUntilRef.current = null;
+      if (sharedIdleUntil !== null) {
+        setSharedIdleUntil(null);
+        restartCameraRef.current?.();
+      }
+    } else {
+      cycleStateRef.current = 'sampling';
+      sampleStartedAtRef.current = null;
+      warmupFramesRef.current = 0;
+    }
+  }, [settings.cameraMode, sharedIdleUntil]);
+
   // Restore saved calibration on mount (only if baselines are present)
   useEffect(() => {
     if (settings.calibration && calibrationSamplesRef.current.length === 0) {
@@ -321,6 +394,7 @@ export const PostureCheck = ({
     streakStartRef.current = null;
     scoreHistoryRef.current = [];
     lastScoreSampleRef.current = 0;
+    awaySinceRef.current = null;
     smoother.reset();
     landmarkSmoother.reset();
     postureWatcher.reset();
@@ -336,10 +410,60 @@ export const PostureCheck = ({
 
   useEffect(() => {
     let cancelled = false;
+    let busyRetryTimeout: number | null = null;
+    let busyAttempts = 0;
+
+    const clearBusyRetry = (): void => {
+      if (busyRetryTimeout !== null) {
+        window.clearTimeout(busyRetryTimeout);
+        busyRetryTimeout = null;
+      }
+    };
 
     const stopStream = (): void => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t) => {
+        t.onended = null;
+        t.stop();
+      });
       streamRef.current = null;
+    };
+
+    const enterIdle = (): void => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      stopStream();
+      if (videoRef.current) videoRef.current.srcObject = null;
+      const overlay = overlayRef.current;
+      overlay?.getContext('2d')?.clearRect(0, 0, overlay.width, overlay.height);
+      timelineRecorder.flush();
+      postureWatcher.reset();
+      window.postureApp?.hideAlert();
+      cycleStateRef.current = 'idle';
+      warmupFramesRef.current = 0;
+      sampleStartedAtRef.current = null;
+      if (streakStartRef.current !== null) {
+        streakStartRef.current = null;
+        setStreakMs(0);
+      }
+      const until = Date.now() + sharedIntervalMsRef.current;
+      idleUntilRef.current = until;
+      setSharedIdleUntil(until);
+      pushFloating('inactive', 0, 'Câmera liberada');
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+      }
+      idleTimeoutRef.current = window.setTimeout(() => {
+        idleTimeoutRef.current = null;
+        if (cancelled) return;
+        if (cameraModeRef.current !== 'shared') return;
+        cycleStateRef.current = 'warmup';
+        warmupFramesRef.current = 0;
+        sampleStartedAtRef.current = null;
+        setSharedIdleUntil(null);
+        void start();
+      }, sharedIntervalMsRef.current);
     };
 
     const runFrame = (): void => {
@@ -359,26 +483,6 @@ export const PostureCheck = ({
       const overlay = overlayRef.current;
       const landmarks = landmarkSmoother.smooth(mapPoseLandmarks(poseLandmarks));
 
-      if (miniViewRef.current === 'face' && poseLandmarks && poseLandmarks.length > 0) {
-        const nose = poseLandmarks[0];
-        const leftEar = poseLandmarks[7];
-        const rightEar = poseLandmarks[8];
-        const fxRaw =
-          (nose?.x ?? 0.5) * 0.6 +
-          ((leftEar?.x ?? nose?.x ?? 0.5) + (rightEar?.x ?? nose?.x ?? 0.5)) * 0.2;
-        const fyRaw =
-          (nose?.y ?? 0.5) * 0.6 +
-          ((leftEar?.y ?? nose?.y ?? 0.5) + (rightEar?.y ?? nose?.y ?? 0.5)) * 0.2;
-        const stage = cameraStageRef.current;
-        if (stage) {
-          const displayedFx = settings.mirrorVideo ? 1 - fxRaw : fxRaw;
-          const clampedX = Math.max(0.15, Math.min(0.85, displayedFx));
-          const clampedY = Math.max(0.15, Math.min(0.85, fyRaw));
-          stage.style.setProperty('--face-x', `${(clampedX * 100).toFixed(1)}%`);
-          stage.style.setProperty('--face-y', `${(clampedY * 100).toFixed(1)}%`);
-        }
-      }
-
       if (overlay && showOverlayRef.current) {
         const bounds = overlay.getBoundingClientRect();
         drawPoseOverlay(overlay, poseLandmarks, {
@@ -392,7 +496,40 @@ export const PostureCheck = ({
 
       const rawAnalysis = analyzePosture(landmarks);
 
+      if (cycleStateRef.current === 'warmup') {
+        if (rawAnalysis.state !== 'calibrating' && isCalibratedRef.current) {
+          warmupFramesRef.current += 1;
+          if (warmupFramesRef.current >= SHARED_WARMUP_FRAMES) {
+            cycleStateRef.current = 'sampling';
+            sampleStartedAtRef.current = now;
+          }
+        }
+        return;
+      }
+
       if (rawAnalysis.state === 'calibrating') {
+        if (isCalibratedRef.current) {
+          awaySinceRef.current ??= now;
+          postureWatcher.observe('away', []);
+          if (now - awaySinceRef.current >= AWAY_GRACE_MS) {
+            smoother.reset();
+            if (streakStartRef.current !== null) {
+              streakStartRef.current = null;
+              setStreakMs(0);
+            }
+            timelineRecorder.flush(now);
+            setAwaitingUpright(false);
+            setAnalysis({
+              state: 'away',
+              score: 0,
+              reasons: [],
+              message: 'Você saiu da câmera. Volte quando estiver pronto.',
+              metrics: rawAnalysis.metrics,
+            });
+            pushFloating('away', 0, 'Fora da tela');
+          }
+          return;
+        }
         postureWatcher.observe('calibrating', []);
         setAwaitingUpright(false);
         setCalibrationProgress(0);
@@ -400,6 +537,8 @@ export const PostureCheck = ({
         pushFloating('calibrating', 0, 'Calibrando');
         return;
       }
+
+      awaySinceRef.current = null;
 
       if (!isCalibratedRef.current) {
         if (!isUprightSample(rawAnalysis.metrics)) {
@@ -463,6 +602,17 @@ export const PostureCheck = ({
       setAnalysis(nextAnalysis);
       pushFloating(nextAnalysis.state, nextAnalysis.score);
 
+      if (cameraModeRef.current === 'shared') {
+        if (cycleStateRef.current === 'continuous') cycleStateRef.current = 'sampling';
+        if (cycleStateRef.current === 'sampling') {
+          sampleStartedAtRef.current ??= now;
+          if (now - sampleStartedAtRef.current >= SHARED_SAMPLE_WINDOW_MS) {
+            enterIdle();
+            return;
+          }
+        }
+      }
+
       if (nextAnalysis.state === 'good') {
         if (streakStartRef.current === null) {
           streakStartRef.current = now;
@@ -476,7 +626,7 @@ export const PostureCheck = ({
       if (now - lastScoreSampleRef.current >= SCORE_SAMPLE_INTERVAL_MS) {
         lastScoreSampleRef.current = now;
         const history = scoreHistoryRef.current;
-        history.push(nextAnalysis.score);
+        history.push({ score: nextAnalysis.score, state: nextAnalysis.state });
         if (history.length > SCORE_HISTORY_MAX) history.shift();
         setScoreHistory([...history]);
       }
@@ -497,20 +647,47 @@ export const PostureCheck = ({
       }
     };
 
+    const scheduleBusyRetry = (): void => {
+      if (cancelled) return;
+      clearBusyRetry();
+      busyAttempts += 1;
+      const delayMs = Math.min(15_000, 1500 + busyAttempts * 1000);
+      busyRetryTimeout = window.setTimeout(() => {
+        busyRetryTimeout = null;
+        if (cancelled) return;
+        void start();
+      }, delayMs);
+    };
+
     const start = async (): Promise<void> => {
+      if (cancelled) return;
       diagnosticCaptureRef.current = {};
       let stream: MediaStream;
 
       try {
         stream = await navigator.mediaDevices.getUserMedia(POSTURE_CHECK_MEDIA_CONSTRAINTS);
       } catch (error) {
-        console.warn('[posture-check] camera error', error);
-        if (!cancelled) {
+        const kind = classifyMediaError(error);
+        console.warn('[posture-check] camera error', kind, error);
+        if (cancelled) return;
+
+        if (kind === 'camera-in-use') {
           diagnosticCaptureRef.current = { error, stream: null };
-          setErrorDetails(formatMediaErrorDetails(error));
-          setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
-          pushFloating('camera-error', 0, 'Sem câmera');
+          setErrorDetails(null);
+          setAnalysis({
+            ...initialAnalysis,
+            state: 'camera-error',
+            message: 'Câmera em uso por outro app. Aguardando ficar livre…',
+          });
+          pushFloating('camera-error', 0, 'Câmera ocupada');
+          scheduleBusyRetry();
+          return;
         }
+
+        diagnosticCaptureRef.current = { error, stream: null };
+        setErrorDetails(formatMediaErrorDetails(error));
+        setAnalysis({ ...initialAnalysis, state: 'camera-error', message: messageForCameraError(error) });
+        pushFloating('camera-error', 0, 'Sem câmera');
         return;
       }
 
@@ -519,7 +696,29 @@ export const PostureCheck = ({
         return;
       }
 
+      busyAttempts = 0;
+      clearBusyRetry();
+
+      stream.getTracks().forEach((t) => {
+        t.onended = (): void => {
+          if (cancelled) return;
+          console.warn('[posture-check] camera track ended — yielding & retrying');
+          stopStream();
+          setAnalysis({
+            ...initialAnalysis,
+            state: 'camera-error',
+            message: 'Câmera tomada por outro app. Aguardando ficar livre…',
+          });
+          pushFloating('camera-error', 0, 'Câmera ocupada');
+          scheduleBusyRetry();
+        };
+      });
+
       streamRef.current = stream;
+
+      if (!settings.cameraPermissionGranted) {
+        onSettingsChange?.({ cameraPermissionGranted: true });
+      }
 
       try {
         if (videoRef.current) {
@@ -537,34 +736,64 @@ export const PostureCheck = ({
         return;
       }
 
-      try {
-        landmarkerRef.current = await createPoseLandmarker();
-      } catch (error) {
-        console.warn('[posture-check] pose landmarker error', error);
-        if (!cancelled) {
-          diagnosticCaptureRef.current = { error, stream: streamRef.current };
-          setErrorDetails(formatMediaErrorDetails(error));
-          setAnalysis({ ...initialAnalysis, state: 'model-error', message: 'Falha ao carregar o detector de pose.' });
-          pushFloating('model-error', 0, 'Erro modelo');
+      if (!landmarkerRef.current) {
+        try {
+          landmarkerRef.current = await createPoseLandmarker();
+        } catch (error) {
+          console.warn('[posture-check] pose landmarker error', error);
+          if (!cancelled) {
+            diagnosticCaptureRef.current = { error, stream: streamRef.current };
+            setErrorDetails(formatMediaErrorDetails(error));
+            setAnalysis({ ...initialAnalysis, state: 'model-error', message: 'Falha ao carregar o detector de pose.' });
+            pushFloating('model-error', 0, 'Erro modelo');
+          }
+          return;
         }
-        return;
       }
 
       if (!cancelled) {
         diagnosticCaptureRef.current = {};
         setErrorDetails(null);
-        setAnalysis((c) => ({ ...c, message: 'Calibrando' }));
+        if (!isCalibratedRef.current) {
+          setAnalysis((c) => ({ ...c, message: 'Calibrando' }));
+        }
         frameRef.current = requestAnimationFrame(runFrame);
       }
+    };
+
+    restartCameraRef.current = (): void => {
+      if (cancelled) return;
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+        idleTimeoutRef.current = null;
+      }
+      idleUntilRef.current = null;
+      setSharedIdleUntil(null);
+      cycleStateRef.current = cameraModeRef.current === 'shared' ? 'sampling' : 'continuous';
+      warmupFramesRef.current = 0;
+      sampleStartedAtRef.current = null;
+      void start();
     };
 
     void start();
 
     return () => {
       cancelled = true;
+      clearBusyRetry();
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+        idleTimeoutRef.current = null;
+      }
+      idleUntilRef.current = null;
+      setSharedIdleUntil(null);
+      restartCameraRef.current = null;
+      cycleStateRef.current = cameraModeRef.current === 'shared' ? 'sampling' : 'continuous';
+      warmupFramesRef.current = 0;
+      sampleStartedAtRef.current = null;
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       stopStream();
       landmarkerRef.current?.close();
+      landmarkerRef.current = null;
       overlayRef.current?.getContext('2d')?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height);
       smoother.reset();
       landmarkSmoother.reset();
@@ -580,18 +809,27 @@ export const PostureCheck = ({
       streakStartRef.current = null;
       scoreHistoryRef.current = [];
       lastScoreSampleRef.current = 0;
+      awaySinceRef.current = null;
     };
   }, [smoother, landmarkSmoother, postureWatcher, timelineRecorder, persistCalibration, pushFloating]);
 
   const isError = analysis.state === 'camera-error' || analysis.state === 'model-error';
+  const isAway = analysis.state === 'away';
   const isActive = analysis.state === 'good' || analysis.state === 'warning' || analysis.state === 'bad';
+  const isSharedIdle = sharedIdleUntil !== null;
+  const sharedRemainingSec = isSharedIdle
+    ? Math.max(0, Math.ceil(((sharedIdleUntil ?? 0) - sharedNow) / 1_000))
+    : 0;
   const hint = hintFor(analysis, awaitingUpright);
   const hintTone = isError
     ? 'error'
-    : awaitingUpright || analysis.state === 'bad' || analysis.state === 'warning'
-      ? 'warn'
-      : 'calibrating';
-  const showCalibrationBar = analysis.state === 'calibrating' && !awaitingUpright && !isError;
+    : isAway
+      ? 'away'
+      : awaitingUpright || analysis.state === 'bad' || analysis.state === 'warning'
+        ? 'warn'
+        : 'calibrating';
+  const showCalibrationBar =
+    analysis.state === 'calibrating' && !awaitingUpright && !isError && !isAway && !isSharedIdle;
   const calibrationPercent = Math.round(calibrationProgress * 100);
 
   const scoreBarModifier =
@@ -622,7 +860,7 @@ export const PostureCheck = ({
       >
         <div
           ref={cameraStageRef}
-          className={`camera-stage${settings.mirrorVideo && miniView !== 'face' ? ' camera-stage--mirrored' : ''}${miniViewClass}`}
+          className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}${miniViewClass}`}
         >
           <div className="camera-stage__inner">
             <video
@@ -646,46 +884,39 @@ export const PostureCheck = ({
               aria-label={statusLabels[analysis.state]}
             />
             <div className="mini-controls__modes" role="group" aria-label="Modo de visualização">
-              <button
-                type="button"
-                className={`mini-mode-btn${miniView === 'full' ? ' mini-mode-btn--active' : ''}`}
-                aria-pressed={miniView === 'full'}
-                aria-label="Câmera completa"
-                title="Câmera completa"
-                onClick={() => onChangeMiniView?.('full')}
-              >
-                <Camera size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={`mini-mode-btn${miniView === 'face' ? ' mini-mode-btn--active' : ''}`}
-                aria-pressed={miniView === 'face'}
-                aria-label="Seguir rosto"
-                title="Seguir rosto"
-                onClick={() => onChangeMiniView?.('face')}
-              >
-                <Crosshair size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={`mini-mode-btn${miniView === 'points' ? ' mini-mode-btn--active' : ''}`}
-                aria-pressed={miniView === 'points'}
-                aria-label="Apenas pontos"
-                title="Apenas pontos"
-                onClick={() => onChangeMiniView?.('points')}
-              >
-                <Sparkles size={14} aria-hidden="true" />
-              </button>
+              <Tooltip label="Mostrar câmera" placement="bottom">
+                <button
+                  type="button"
+                  className={`mini-mode-btn${miniView === 'full' ? ' mini-mode-btn--active' : ''}`}
+                  aria-pressed={miniView === 'full'}
+                  aria-label="Mostrar câmera"
+                  onClick={() => onChangeMiniView?.('full')}
+                >
+                  <Camera size={14} aria-hidden="true" />
+                </button>
+              </Tooltip>
+              <Tooltip label="Ocultar câmera (modo privado)" placement="bottom">
+                <button
+                  type="button"
+                  className={`mini-mode-btn${miniView === 'points' ? ' mini-mode-btn--active' : ''}`}
+                  aria-pressed={miniView === 'points'}
+                  aria-label="Ocultar câmera (modo privado)"
+                  onClick={() => onChangeMiniView?.('points')}
+                >
+                  <EyeOff size={14} aria-hidden="true" />
+                </button>
+              </Tooltip>
             </div>
-            <button
-              type="button"
-              className="mini-mode-btn mini-mode-btn--expand"
-              aria-label="Expandir janela"
-              title="Expandir janela"
-              onClick={() => onExitMini?.()}
-            >
-              <Maximize2 size={14} aria-hidden="true" />
-            </button>
+            <Tooltip label="Expandir janela" placement="bottom">
+              <button
+                type="button"
+                className="mini-mode-btn mini-mode-btn--expand"
+                aria-label="Expandir janela"
+                onClick={() => onExitMini?.()}
+              >
+                <Maximize2 size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
           </div>
 
           {analysis.state === 'good' && streakMs >= 1000 ? (
@@ -699,6 +930,22 @@ export const PostureCheck = ({
             <p className="mini-error" role="alert">
               {analysis.message}
             </p>
+          ) : null}
+
+          {isAway ? (
+            <div className="mini-away" role="status" aria-live="polite">
+              <UserX size={14} aria-hidden="true" />
+              <span>Fora da tela</span>
+            </div>
+          ) : null}
+
+          {isSharedIdle ? (
+            <div className="mini-shared-idle" role="status" aria-live="polite">
+              <Pause size={14} aria-hidden="true" />
+              <span>
+                Câmera livre · próxima leitura em {sharedRemainingSec}s
+              </span>
+            </div>
           ) : null}
         </div>
       </section>
@@ -722,15 +969,19 @@ export const PostureCheck = ({
           >
             <RotateCcw size={20} aria-hidden="true" />
           </button>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label="Modo janela compacta"
-            title="Encolhe a janela e posiciona no canto inferior direito da tela onde o cursor está"
-            onClick={() => onChangeMiniView?.('full')}
+          <Tooltip
+            label="Reduz a janela e mantém o monitor de postura visível por cima dos outros apps"
+            placement="bottom"
           >
-            <PictureInPicture2 size={20} aria-hidden="true" />
-          </button>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Reduzir para janela flutuante"
+              onClick={() => onChangeMiniView?.('full')}
+            >
+              <PictureInPicture2 size={20} aria-hidden="true" />
+            </button>
+          </Tooltip>
           <button className="button button--text" type="button" onClick={onStop}>
             Pausar
           </button>
@@ -752,6 +1003,26 @@ export const PostureCheck = ({
             {hint}
           </div>
         ) : null}
+        {isAway ? (
+          <div className="away-banner" role="status" aria-live="polite">
+            <UserX size={28} aria-hidden="true" />
+            <div className="away-banner__text">
+              <strong className="away-banner__title">Você saiu da câmera</strong>
+              <span className="away-banner__hint">Monitoramento pausado. Volte quando estiver pronto.</span>
+            </div>
+          </div>
+        ) : null}
+        {isSharedIdle ? (
+          <div className="shared-idle-banner" role="status" aria-live="polite">
+            <Pause size={28} aria-hidden="true" />
+            <div className="shared-idle-banner__text">
+              <strong className="shared-idle-banner__title">Câmera liberada</strong>
+              <span className="shared-idle-banner__hint">
+                Outros apps podem usar a câmera. Próxima leitura em {sharedRemainingSec}s.
+              </span>
+            </div>
+          </div>
+        ) : null}
         {showCalibrationBar ? (
           <div
             className="calibration-progress"
@@ -766,25 +1037,26 @@ export const PostureCheck = ({
         ) : null}
         {isActive && analysis.state === 'good' && streakMs >= 1000 ? (
           <div className="streak-pill" aria-live="polite" aria-label={`Streak de postura ${formatStreak(streakMs)}`}>
-            <Flame size={14} aria-hidden="true" />
+            <Flame size={16} aria-hidden="true" />
+            <span className="streak-pill__label">Streak</span>
             <span className="streak-pill__time">{formatStreak(streakMs)}</span>
           </div>
         ) : null}
         {isActive && scoreHistory.length >= 2 ? (
-          <div
-            className={`sparkline sparkline--${analysis.state}`}
-            aria-hidden="true"
-          >
+          <div className="sparkline" aria-hidden="true">
             <svg viewBox="0 0 100 24" preserveAspectRatio="none">
-              <polyline
-                points={buildSparklinePoints(scoreHistory, 100, 24)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-              />
+              {buildSparklineSegments(scoreHistory, 100, 24).map((segment, i) => (
+                <line
+                  key={i}
+                  x1={segment.x1}
+                  y1={segment.y1}
+                  x2={segment.x2}
+                  y2={segment.y2}
+                  className={`sparkline__seg sparkline__seg--${segment.state}`}
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
             </svg>
           </div>
         ) : null}
@@ -859,11 +1131,19 @@ export const PostureCheck = ({
       ) : null}
 
       {isActive ? (
-        <div className="score-bar" aria-label={`Score ${analysis.score}`}>
-          <div
-            className={`score-bar__fill${scoreBarModifier}`}
-            style={{ width: `${analysis.score}%` }}
-          />
+        <div className="score-scale-group">
+          <div className="score-bar" aria-label={`Score ${analysis.score}`}>
+            <div
+              className={`score-bar__fill${scoreBarModifier}`}
+              style={{ width: `${analysis.score}%` }}
+            />
+          </div>
+          <div className="score-scale" aria-hidden="true">
+            <span className="score-scale__tick">0</span>
+            <span className="score-scale__tick">50</span>
+            <span className="score-scale__tick">75</span>
+            <span className="score-scale__tick">100</span>
+          </div>
         </div>
       ) : null}
     </section>

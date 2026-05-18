@@ -21,6 +21,13 @@ contextBridge.exposeInMainWorld('postureApp', {
   exitMini: (): void => {
     ipcRenderer.send('posture-mini:exit');
   },
+  onMiniActive: (cb: (active: boolean) => void): (() => void) => {
+    const listener = (_event: unknown, active: unknown): void => cb(Boolean(active));
+    ipcRenderer.on('posture-mini:active', listener);
+    return (): void => {
+      ipcRenderer.off('posture-mini:active', listener);
+    };
+  },
   updateFloating: (payload: { state: string; label: string; score: number }): void => {
     ipcRenderer.send('posture-floating:update', payload);
   },

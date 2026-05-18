@@ -17,6 +17,9 @@ const baseThresholds: PostureThresholds = {
   slouchBad: 0.84,
   headDownWarning: 0.92,
   headDownBad: 0.82,
+  hunchSignificantDeficit: 0.03,
+  hunchCompositeWarning: 0.04,
+  hunchCompositeBad: 0.075,
 };
 
 const median = (values: number[]): number => {
@@ -75,5 +78,8 @@ export const createPersonalizedThresholds = (
     slouchBad: baseThresholds.slouchBad,
     headDownWarning: baseThresholds.headDownWarning,
     headDownBad: baseThresholds.headDownBad,
+    hunchSignificantDeficit: baseThresholds.hunchSignificantDeficit,
+    hunchCompositeWarning: baseThresholds.hunchCompositeWarning,
+    hunchCompositeBad: baseThresholds.hunchCompositeBad,
   };
 };

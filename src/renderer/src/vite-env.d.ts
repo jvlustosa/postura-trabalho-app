@@ -25,6 +25,7 @@ interface Window {
     notify?: (level: 'warning' | 'bad', message: string) => void;
     enterMini?: () => void;
     exitMini?: () => void;
+    onMiniActive?: (cb: (active: boolean) => void) => () => void;
     updateFloating?: (payload: PostureFloatingPayload) => void;
     setAnalysisActive?: (active: boolean) => void;
     setFocusConfig?: (config: { enabled: boolean; opacity: number }) => void;
