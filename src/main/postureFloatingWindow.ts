@@ -424,7 +424,7 @@ export const openFloatingMenu = (
 
   const menu = Menu.buildFromTemplate([
     {
-      label: 'Abrir Postura Trabalho',
+      label: 'Abrir PosturaCerta',
       click: () => options.onRestore(),
     },
     { type: 'separator' },

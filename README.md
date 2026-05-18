@@ -1,4 +1,4 @@
-# Postura Trabalho
+# PosturaCerta
 
 MVP desktop local para Linux, Windows e macOS com Electron, React e detecção de postura via MediaPipe Pose Landmarker.
 
@@ -8,17 +8,17 @@ Baixe a versão mais recente na página de [Releases](../../releases):
 
 | Plataforma | Arquivo | Tipo |
 |------------|---------|------|
-| **Windows** | `Postura-Trabalho-Setup-x.x.x.exe` | Instalador (NSIS) |
-| **Windows** | `Postura-Trabalho-x.x.x.exe` | Portable (sem instalação) |
-| **macOS (Apple Silicon)** | `Postura-Trabalho-x.x.x-arm64.dmg` | Imagem de disco |
-| **macOS (Intel)** | `Postura-Trabalho-x.x.x.dmg` | Imagem de disco |
-| **macOS (zip)** | `Postura-Trabalho-x.x.x-mac.zip` | Para auto-update |
-| **Linux** | `Postura-Trabalho-x.x.x.AppImage` | AppImage |
-| **Linux** | `postura-trabalho_x.x.x_amd64.deb` | Debian/Ubuntu |
+| **Windows** | `PosturaCerta-Setup-x.x.x.exe` | Instalador (NSIS) |
+| **Windows** | `PosturaCerta-x.x.x.exe` | Portable (sem instalação) |
+| **macOS (Apple Silicon)** | `PosturaCerta-x.x.x-arm64.dmg` | Imagem de disco |
+| **macOS (Intel)** | `PosturaCerta-x.x.x.dmg` | Imagem de disco |
+| **macOS (zip)** | `PosturaCerta-x.x.x-mac.zip` | Para auto-update |
+| **Linux** | `PosturaCerta-x.x.x.AppImage` | AppImage |
+| **Linux** | `postura-certa_x.x.x_amd64.deb` | Debian/Ubuntu |
 
 > **Nota Windows:** como o app não possui assinatura digital (code signing), o SmartScreen pode exibir um aviso. Clique em "Mais informações" → "Executar assim mesmo".
 >
-> **Nota macOS:** o app não é assinado nem notarizado pela Apple. Ao abrir pela primeira vez, o Gatekeeper bloqueia. Solução: clique com o botão direito no `.app` → "Abrir" → confirme "Abrir". Em macOS Sonoma/Sequoia, abra **Ajustes do Sistema → Privacidade e Segurança** e clique em "Abrir mesmo assim". Se persistir, no Terminal: `xattr -dr com.apple.quarantine "/Applications/Postura Trabalho.app"`.
+> **Nota macOS:** o app não é assinado nem notarizado pela Apple. Ao abrir pela primeira vez, o Gatekeeper bloqueia. Solução: clique com o botão direito no `.app` → "Abrir" → confirme "Abrir". Em macOS Sonoma/Sequoia, abra **Ajustes do Sistema → Privacidade e Segurança** e clique em "Abrir mesmo assim". Se persistir, no Terminal: `xattr -dr com.apple.quarantine "/Applications/PosturaCerta.app"`.
 
 ## Scripts
 

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Instala o AppImage em ~/Applications/postura-trabalho.AppImage e registra no menu.
+# Instala o AppImage em ~/Applications/postura-certa.AppImage e registra no menu.
 # Se o app estiver aberto, sobrescrever o mesmo caminho com "cp" quebra (ETXTBSY); copiamos para .new e fazemos "mv".
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="${1:-$ROOT/release/Postura Trabalho-1.0.0.AppImage}"
+SRC="${1:-$ROOT/release/PosturaCerta-1.0.0.AppImage}"
 DEST_DIR="${HOME}/Applications"
-DEST="${DEST_DIR}/postura-trabalho.AppImage"
+DEST="${DEST_DIR}/postura-certa.AppImage"
 ICON_DIR="${HOME}/.local/share/icons"
 APP_DIR="${HOME}/.local/share/applications"
-DESKTOP="${APP_DIR}/postura-trabalho.desktop"
-ICON_PNG="${ICON_DIR}/postura-trabalho.png"
+DESKTOP="${APP_DIR}/postura-certa.desktop"
+ICON_PNG="${ICON_DIR}/postura-certa.png"
 
 mkdir -p "$DEST_DIR" "$ICON_DIR" "$APP_DIR"
 
 # Ícone do menu: PNG gerado em build/icon-desktop.png (512²); fallback app-logo.
-rm -f "${ICON_DIR}/postura-trabalho.svg"
+rm -f "${ICON_DIR}/postura-certa.svg"
 if [[ -f "$ROOT/build/icon-desktop.png" ]]; then
   cp "$ROOT/build/icon-desktop.png" "$ICON_PNG"
 elif [[ -f "$ROOT/public/app-logo.png" ]]; then
@@ -54,15 +54,15 @@ cat > "$DESKTOP" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Postura Trabalho
+Name=PosturaCerta
 GenericName=Postura
 Comment=Monitore sua postura ao trabalhar
-Keywords=postura;postura trabalho;ergonomia;webcam;saude;trabalho;
+Keywords=postura;postura certa;ergonomia;webcam;saude;trabalho;
 Exec=${DEST} --no-sandbox
 Icon=${ICON_FOR_DESKTOP}
 Terminal=false
 Categories=Utility;Health;
-StartupWMClass=Postura Trabalho
+StartupWMClass=PosturaCerta
 EOF
 
 chmod 644 "$DESKTOP"

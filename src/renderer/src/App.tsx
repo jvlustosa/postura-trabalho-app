@@ -91,7 +91,7 @@ const MiniApp = (): ReactElement => {
     <div className="mini-shell" data-mini-view={miniView}>
       <header className="mini-shell__chrome">
         <span className="mini-shell__drag" aria-hidden="true">
-          Postura Trabalho
+          PosturaCerta
         </span>
         <div className="mini-shell__chrome-actions">
           <button
@@ -320,7 +320,7 @@ const MainApp = (): ReactElement => {
         <header className="app-bar">
           <div className="app-bar__brand app-bar__brand--static">
             <img className="app-bar__logo" src="./app-logo.png" alt="" />
-            <h1 className="app-bar__title">Postura Trabalho</h1>
+            <h1 className="app-bar__title">PosturaCerta</h1>
           </div>
           <WindowControls />
         </header>
@@ -346,7 +346,7 @@ const MainApp = (): ReactElement => {
           onClick={() => setView(checkActive ? 'active' : 'idle')}
         >
           <img className="app-bar__logo" src="./app-logo.png" alt="" />
-          <h1 className="app-bar__title">Postura Trabalho</h1>
+          <h1 className="app-bar__title">PosturaCerta</h1>
         </button>
         <div className="app-bar__actions">
           {checkActive ? (

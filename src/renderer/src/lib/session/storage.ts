@@ -1,4 +1,4 @@
-const SESSION_KEY = 'postura-trabalho-session';
+const SESSION_KEY = 'postura-certa-session';
 
 export interface SessionState {
   checkActive: boolean;

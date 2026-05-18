@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { App } from './App';
 
-const STORAGE_KEY = 'postura-trabalho.settings.v1';
+const STORAGE_KEY = 'postura-certa.settings.v1';
 
 const createMemoryStorage = (): Storage => {
   const data = new Map<string, string>();

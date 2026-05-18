@@ -37,7 +37,7 @@ describe('timeline storage', () => {
 
   it('discards malformed segments', () => {
     window.localStorage.setItem(
-      'postura-trabalho.timeline.v1',
+      'postura-certa.timeline.v1',
       JSON.stringify([
         { state: 'good', startedAt: 1, endedAt: 5 },
         { state: 'invalid', startedAt: 0, endedAt: 1 },

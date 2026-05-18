@@ -74,7 +74,7 @@ export async function buildCameraDiagnosticReport(
   options: CameraDiagnosticOptions,
 ): Promise<string> {
   const lines: string[] = [];
-  lines.push('Postura Trabalho: log detalhado (câmera / mídia)');
+  lines.push('PosturaCerta: log detalhado (câmera / mídia)');
   lines.push(`timestamp_iso: ${new Date().toISOString()}`);
   lines.push(`surface: ${options.surface}`);
   if (options.uiMessage) lines.push(`mensagem_ui: ${options.uiMessage}`);

@@ -13,7 +13,7 @@ import {
   type Weekday,
 } from './types';
 
-const STORAGE_KEY = 'postura-trabalho.settings.v1';
+const STORAGE_KEY = 'postura-certa.settings.v1';
 
 const sensitivityValues: readonly SensitivityLevel[] = ['relaxed', 'standard', 'strict'];
 const calibrationValues: readonly AppSettings['calibrationSeconds'][] = [3, 5, 8];

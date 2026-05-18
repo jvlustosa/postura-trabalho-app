@@ -1,6 +1,6 @@
 import type { TimelineSegment, TimelineState } from './types';
 
-const STORAGE_KEY = 'postura-trabalho.timeline.v1';
+const STORAGE_KEY = 'postura-certa.timeline.v1';
 const MAX_SEGMENTS = 5000;
 const DEFAULT_RETENTION_DAYS = 7;
 

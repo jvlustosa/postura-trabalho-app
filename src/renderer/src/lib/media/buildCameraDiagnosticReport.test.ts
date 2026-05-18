@@ -46,7 +46,7 @@ describe('buildCameraDiagnosticReport', () => {
       constraints: { video: true, audio: false },
     });
 
-    expect(report).toContain('Postura Trabalho: log detalhado');
+    expect(report).toContain('PosturaCerta: log detalhado');
     expect(report).toContain('surface: calibration');
     expect(report).toContain('mensagem_ui: Falhou');
     expect(report).toContain('classifyMediaError: camera-in-use');

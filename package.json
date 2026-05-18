@@ -1,8 +1,8 @@
 {
-  "name": "postura-trabalho",
+  "name": "postura-certa",
   "version": "1.0.0",
-  "description": "Desktop posture checker with local webcam pose detection.",
-  "homepage": "https://example.com/postura-trabalho",
+  "description": "PosturaCerta — desktop posture checker with local webcam pose detection.",
+  "homepage": "https://posturacerta.com",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -25,14 +25,14 @@
   },
   "keywords": [],
   "author": {
-    "name": "Postura Trabalho",
-    "email": "postura-trabalho@example.com"
+    "name": "PosturaCerta",
+    "email": "contato@posturacerta.com"
   },
   "license": "ISC",
   "type": "module",
   "build": {
-    "appId": "com.local.posturatrabalho",
-    "productName": "Postura Trabalho",
+    "appId": "com.posturacerta.app",
+    "productName": "PosturaCerta",
     "icon": "build/icon.png",
     "directories": {
       "output": "release"
@@ -92,12 +92,12 @@
       "identity": null,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "NSCameraUsageDescription": "O Postura Trabalho usa sua câmera localmente para analisar sua postura. Nenhuma imagem é enviada para servidores.",
-        "NSMicrophoneUsageDescription": "O Postura Trabalho não captura áudio; permissão solicitada apenas pelo runtime do navegador interno."
+        "NSCameraUsageDescription": "O PosturaCerta usa sua câmera localmente para analisar sua postura. Nenhuma imagem é enviada para servidores.",
+        "NSMicrophoneUsageDescription": "O PosturaCerta não captura áudio; permissão solicitada apenas pelo runtime do navegador interno."
       }
     },
     "dmg": {
-      "title": "Postura Trabalho ${version}",
+      "title": "PosturaCerta ${version}",
       "icon": "build/icon.png",
       "contents": [
         { "x": 130, "y": 220 },
