@@ -14,6 +14,7 @@ const sample = (
   headOffset,
   shoulderTilt,
   neckTilt,
+  neckRotation: 0,
   shoulderWidth,
   torsoAspectRatio,
   headVerticalRatio,

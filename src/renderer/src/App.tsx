@@ -17,6 +17,7 @@ import {
   Square,
   StopCircle,
   X,
+  Download,
 } from 'lucide-react';
 
 import { classifyMediaError } from './lib/media/classifyMediaError';
@@ -39,15 +40,6 @@ export type MiniView = 'off' | 'full' | 'face' | 'points';
 
 const isMiniRenderer =
   typeof window !== 'undefined' && window.location.hash.replace(/^#/, '') === 'mini';
-
-if (typeof window !== 'undefined') {
-  console.log('[renderer] boot', {
-    hash: window.location.hash,
-    isMiniRenderer,
-    hasBridge: Boolean(window.postureApp),
-    hasEnterMini: Boolean(window.postureApp?.enterMini),
-  });
-}
 
 const formatElapsed = (ms: number): string => {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -154,13 +146,16 @@ const MainApp = (): ReactElement => {
   const autoStartedRef = useRef(initialSession.checkActive);
   const accumulatedMsRef = useRef(initialSession.accumulatedMs);
   const runStartedAtRef = useRef<number | null>(initialSession.runStartedAt);
+  const [updateStatus, setUpdateStatus] = useState<
+    'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
+  >('idle');
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
 
   const exitMini = useCallback((): void => {
     window.postureApp?.exitMini?.();
   }, []);
 
   const enterMini = useCallback((): void => {
-    console.log('[renderer] enterMini click → IPC');
     window.postureApp?.enterMini?.();
   }, []);
 
@@ -233,8 +228,27 @@ const MainApp = (): ReactElement => {
 
   useEffect(() => {
     const off = window.postureApp?.onMiniActive?.((active) => {
-      console.log('[renderer] miniActive →', active);
       setMiniActive(active);
+    });
+    return () => {
+      off?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    const off = window.postureApp?.onUpdateStatus?.((payload) => {
+      const status = payload.status;
+      if (
+        status === 'idle' ||
+        status === 'checking' ||
+        status === 'available' ||
+        status === 'downloading' ||
+        status === 'downloaded' ||
+        status === 'error'
+      ) {
+        setUpdateStatus(status);
+      }
+      setUpdateVersion(payload.version);
     });
     return () => {
       off?.();
@@ -421,6 +435,28 @@ const MainApp = (): ReactElement => {
           <WindowControls />
         </div>
       </header>
+
+      {updateStatus === 'downloaded' ? (
+        <div className="update-banner" role="status">
+          <Download size={16} aria-hidden="true" />
+          <span>
+            Nova versão{updateVersion ? ` (${updateVersion})` : ''} pronta para instalar.
+          </span>
+          <button
+            className="button button--filled update-banner__action"
+            type="button"
+            onClick={() => {
+              void window.postureApp?.installUpdate?.();
+            }}
+          >
+            Reiniciar agora
+          </button>
+        </div>
+      ) : updateStatus === 'downloading' ? (
+        <div className="update-banner update-banner--info" role="status">
+          Baixando atualização…
+        </div>
+      ) : null}
 
       <main className={`app-content${view === 'active' ? ' app-content--wide' : ''}`}>
         {checkActive && !isPaused && !miniActive ? (

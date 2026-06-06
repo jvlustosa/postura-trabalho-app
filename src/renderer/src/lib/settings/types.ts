@@ -49,6 +49,7 @@ export interface AppSettings {
   schedule: ScheduleConfig;
   cameraMode: CameraMode;
   sharedCheckIntervalSeconds: SharedCheckIntervalSeconds;
+  cameraDeviceId: string | null;
 }
 
 export const defaultSchedule: ScheduleConfig = {
@@ -76,4 +77,5 @@ export const defaultSettings: AppSettings = {
   schedule: defaultSchedule,
   cameraMode: 'continuous',
   sharedCheckIntervalSeconds: 30,
+  cameraDeviceId: null,
 };

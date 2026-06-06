@@ -128,6 +128,11 @@ const WelcomeStep = (): ReactElement => (
       A webcam percebe quando você escorrega na cadeira e o app avisa na hora. Nada sai deste
       computador.
     </p>
+    <ol className="onboarding-m__quicksteps">
+      <li>Permita a câmera quando pedir</li>
+      <li>Ajuste a altura da tela e calibre sentado direito</li>
+      <li>Pronto — o monitoramento roda sozinho</li>
+    </ol>
   </div>
 );
 

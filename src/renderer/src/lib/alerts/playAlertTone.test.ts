@@ -78,8 +78,6 @@ class FakeAudioContext {
     );
 
     instances.push(ctx);
-    // returning ctx replaces the freshly-constructed `this`
-    // eslint-disable-next-line no-constructor-return
     return ctx as unknown as FakeAudioContext;
   }
 }

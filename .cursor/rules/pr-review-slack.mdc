@@ -1,0 +1,61 @@
+---
+description: Guidelines for generating structured PR review messages for Slack — concise, QA-actionable format
+globs: "**/*"
+alwaysApply: false
+---
+
+# PR Review Slack Message Format
+
+## When to Use
+
+Trigger when user requests: "gerar comentário de PR", "PR review para QA", "comentário para slack", "review QA"
+
+## Required Format
+
+```
+#PR Review: [Título descritivo e conciso] ([link da PR se disponível])
+Ticket: [Contexto do ticket] → [Item específico] ([link Slack se disponível])
+
+[Categoria] :emoji: — [Descrição de 1 linha: mudança + impacto]
+[Categoria] :emoji: — [Descrição de 1 linha: mudança + impacto]
+[Categoria] :emoji: — [Descrição de 1 linha: mudança + impacto]
+Dev: @Vitor
+QA: @Concli — [instruções específicas de teste]
+```
+
+**Notes:**
+- Ticket line is optional (include when there's a Slack thread or ticket link)
+- Use Slack emoji syntax (`:white_check_mark:`, `:zap:`, `:lock:`, `:fire:`, `:bug:`)
+- Dev defaults to `Vitor` unless explicitly specified otherwise
+- QA defaults to `Concli` unless explicitly specified otherwise
+
+## Best Practices
+
+- Maximum 5-6 items, 1 line each
+- No blank lines between items (Slack formatting)
+- Focus on QA-relevant changes, not implementation details
+- Use emojis sparingly for emphasis
+- Highlight priorities and critical items
+- Include PR link when available
+
+## Emoji Guide
+
+- `:white_check_mark:` New feature
+- `:zap:` Enhancement / UX improvement
+- `:lock:` Security / permissions
+- `:fire:` Significant performance improvement (>50%)
+- `:bug:` Important bugfix
+- `:warning:` Breaking change or special attention
+- `:card_file_box:` SQL migration
+
+## Analysis Process
+
+1. Analyze all changes in the branch (all commits from main, not just latest)
+2. Identify main features/fixes, group related changes
+3. Prioritize for QA: what needs testing? what's user-facing? what's risky?
+4. Structure as 5-6 items max, 1 line each
+5. Add specific testing guidance in QA line
+
+## Categories
+
+- Filtros, Performance, UX/UI, Bugfix, API, Autenticação, Mensagens, Contatos, Funil, Agendamento, Uploads

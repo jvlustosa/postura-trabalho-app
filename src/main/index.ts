@@ -15,6 +15,23 @@ import {
   updatePostureFloating,
 } from './postureFloatingWindow';
 
+if (process.platform === 'linux') {
+  // Use PipeWire's camera portal when available, which allows multiple processes
+  // (Postura + Meet/Zoom/OBS) to share the physical webcam instead of fighting
+  // for v4l2 exclusive access.
+  app.commandLine.appendSwitch('enable-features', 'PipeWireCamera,WebRTCPipeWireCapturer');
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+const isDev = !app.isPackaged;
+const debug = (...args: unknown[]): void => {
+  if (isDev) console.log(...args);
+};
+
 const { autoUpdater } = electronUpdater;
 
 autoUpdater.logger = null;
@@ -39,7 +56,7 @@ const MINI_MARGIN = 16;
 const MINI_MIN_WIDTH = 220;
 const MINI_MIN_HEIGHT = 160;
 
-const PRELOAD_PATH = join(__dirname, '../preload/index.js');
+const PRELOAD_PATH = join(__dirname, '../preload/index.cjs');
 
 let mainWindow: BrowserWindow | null = null;
 let miniWindow: BrowserWindow | null = null;
@@ -48,8 +65,21 @@ let analysisActive = false;
 let floatingEnabled = true;
 let floatingOpacity = 0.85;
 let lastFloatingState: FloatingState = { state: 'inactive', label: 'Inativo', score: 0 };
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
+
 /** True after electron-updater fetched a build; Ctrl/Cmd+Shift+R then restarts into the new version. */
 let updateDownloaded = false;
+let updateStatus: UpdateStatus = 'idle';
+let pendingUpdateVersion: string | null = null;
+
+const broadcastUpdateStatus = (): void => {
+  const payload = { status: updateStatus, version: pendingUpdateVersion };
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send('app:update-status', payload);
+    }
+  }
+};
 
 const attachHardReloadShortcut = (window: BrowserWindow): void => {
   window.webContents.on('before-input-event', (event, input) => {
@@ -99,7 +129,7 @@ const CAMERA_HANDOFF_DELAY_MS = 250;
 const createMiniWindow = (): void => {
   const main = mainWindow;
   if (!main || main.isDestroyed()) {
-    console.warn('[mini] cannot open: main window missing');
+    debug('[mini] cannot open: main window missing');
     return;
   }
 
@@ -127,7 +157,7 @@ const createMiniWindow = (): void => {
   });
 
   miniWindow = window;
-  console.log('[mini] window created');
+  debug('[mini] window created');
 
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -136,11 +166,11 @@ const createMiniWindow = (): void => {
     if (window.isDestroyed()) return;
     window.show();
     window.focus();
-    console.log('[mini] window shown');
+    debug('[mini] window shown');
   });
 
   window.on('closed', () => {
-    console.log('[mini] window closed');
+    debug('[mini] window closed');
     if (miniWindow === window) {
       miniWindow = null;
     }
@@ -165,11 +195,11 @@ const enterMiniMode = (): void => {
     return;
   }
   if (!mainWindow || mainWindow.isDestroyed()) {
-    console.warn('[mini] enter aborted: main window missing');
+    debug('[mini] enter aborted: main window missing');
     return;
   }
 
-  console.log('[mini] entering mini mode');
+  debug('[mini] entering mini mode');
   notifyMiniActive(true);
   setTimeout(createMiniWindow, CAMERA_HANDOFF_DELAY_MS);
 };
@@ -376,13 +406,25 @@ const registerIpcHandlers = (): void => {
   });
 
   ipcMain.on('posture-mini:enter', () => {
-    console.log('[main] IPC posture-mini:enter received');
+    debug('[main] IPC posture-mini:enter received');
     enterMiniMode();
   });
 
   ipcMain.on('posture-mini:exit', () => {
-    console.log('[main] IPC posture-mini:exit received');
+    debug('[main] IPC posture-mini:exit received');
     exitMiniMode();
+  });
+
+  ipcMain.handle('app:get-info', () => ({
+    name: app.getName(),
+    version: app.getVersion(),
+    platform: process.platform,
+  }));
+
+  ipcMain.handle('app:install-update', () => {
+    if (!updateDownloaded) return false;
+    autoUpdater.quitAndInstall(false, true);
+    return true;
   });
 
   const senderWindow = (event: Electron.IpcMainEvent): BrowserWindow | null => {
@@ -438,14 +480,15 @@ const registerIpcHandlers = (): void => {
   });
 };
 
-app.whenReady().then(() => {
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const pageUrl = webContents.getURL();
     // Chromium may emit a follow-up request as `unknown`; denying it breaks getUserMedia
     // when a handler is registered (see electron#36629).
     const granted =
       permission === 'media' || (permission === 'unknown' && isAppRendererUrl(pageUrl));
-    console.log('[main] permission request', { permission, pageUrl, details, granted });
+    debug('[main] permission request', { permission, pageUrl, details, granted });
     callback(granted);
   });
 
@@ -454,7 +497,7 @@ app.whenReady().then(() => {
     const granted =
       permission === 'media' ||
       ((details.mediaType === 'video' || details.mediaType === 'audio') && isAppRendererUrl(url));
-    console.log('[main] permission check', { permission, requestingOrigin, details, granted });
+    debug('[main] permission check', { permission, requestingOrigin, details, granted });
     return granted;
   });
 
@@ -462,11 +505,43 @@ app.whenReady().then(() => {
   createWindow();
 
   if (app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml'))) {
-    autoUpdater.on('update-downloaded', () => {
-      updateDownloaded = true;
+    autoUpdater.on('checking-for-update', () => {
+      updateStatus = 'checking';
+      broadcastUpdateStatus();
     });
-    void autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
+    autoUpdater.on('update-available', (info) => {
+      updateStatus = 'available';
+      pendingUpdateVersion = info.version ?? null;
+      broadcastUpdateStatus();
+    });
+    autoUpdater.on('download-progress', () => {
+      updateStatus = 'downloading';
+      broadcastUpdateStatus();
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+      updateDownloaded = true;
+      updateStatus = 'downloaded';
+      pendingUpdateVersion = info.version ?? pendingUpdateVersion;
+      broadcastUpdateStatus();
+    });
+    autoUpdater.on('update-not-available', () => {
+      updateStatus = 'idle';
+      pendingUpdateVersion = null;
+      broadcastUpdateStatus();
+    });
+    autoUpdater.on('error', () => {
+      updateStatus = 'error';
+      broadcastUpdateStatus();
+    });
+    void autoUpdater.checkForUpdatesAndNotify().catch(() => {
+      updateStatus = 'error';
+      broadcastUpdateStatus();
+    });
   }
+
+  app.on('second-instance', () => {
+    restoreMainWindow();
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -475,16 +550,17 @@ app.whenReady().then(() => {
       restoreMainWindow();
     }
   });
-});
+  });
 
-app.on('before-quit', () => {
-  isQuitting = true;
-});
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
 
-app.on('window-all-closed', () => {
-  hidePostureAlert();
-  hidePostureFloating();
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+  app.on('window-all-closed', () => {
+    hidePostureAlert();
+    hidePostureFloating();
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+}

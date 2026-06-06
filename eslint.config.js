@@ -3,7 +3,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['out', 'release', 'node_modules', 'public/mediapipe', 'public/models'],
+    ignores: [
+      'out',
+      'release',
+      'node_modules',
+      'public/mediapipe',
+      'public/models',
+      'landing-next',
+      'landing',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

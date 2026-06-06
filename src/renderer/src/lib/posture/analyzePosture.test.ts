@@ -33,6 +33,8 @@ const calibrated = (overrides: Partial<PostureThresholds> = {}): PostureThreshol
   hunchSignificantDeficit: 0.03,
   hunchCompositeWarning: 0.04,
   hunchCompositeBad: 0.075,
+  neckRotationWarning: 0.30,
+  neckRotationBad: 0.52,
   ...overrides,
 });
 
@@ -49,9 +51,13 @@ describe('analyzePosture', () => {
   });
 
   it('warns on head-forward offset', () => {
-    const landmarks = baseLandmarks().map((l) =>
-      l.name === 'nose' ? { ...l, x: 0.68 } : l,
-    );
+    const shift = 0.18;
+    const landmarks = baseLandmarks().map((l) => {
+      if (l.name === 'nose' || l.name === 'leftEar' || l.name === 'rightEar') {
+        return { ...l, x: l.x + shift };
+      }
+      return l;
+    });
     const result = analyzePosture(landmarks);
     expect(result.state).toBe('warning');
     expect(result.reasons).toContain('head-forward');

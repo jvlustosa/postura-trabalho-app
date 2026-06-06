@@ -1,0 +1,29 @@
+---
+description: ChatJuridico global coding standards — applies across all CJ repos (installed via devkit)
+globs: **/*
+alwaysApply: true
+---
+
+# ChatJuridico Global Standards
+
+> Canonical source: `chatjuridico-devkit/CLAUDE.md` · Skills: `~/.cursor/skills/cj-*`
+
+## Non-negotiables
+
+1. Tenant isolation — scope every query by `office_id`; never bypass Supabase RLS.
+2. No PII in logs or LLM output.
+3. LGPD compliance on all personal data.
+4. UI copy in pt-BR; code in English.
+5. No secrets in source; no `console.log` in production.
+
+## How to work
+
+- Minimal diff; solve the asked problem only.
+- Read surrounding code; match existing conventions.
+- No over-engineering or premature abstraction.
+- Only commit when explicitly asked.
+- Branch names use hyphens: `feature-nome`.
+
+## When stuck
+
+Use devkit skills: `cj-code-review`, `cj-systematic-debugging`, `cj-writing-plans`.

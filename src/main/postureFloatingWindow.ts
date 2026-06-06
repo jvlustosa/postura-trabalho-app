@@ -352,7 +352,7 @@ export const showPostureFloating = (preloadPath: string, opacity = DEFAULT_OPACI
     minimizable: false,
     maximizable: false,
     closable: false,
-    focusable: true,
+    focusable: false,
     alwaysOnTop: true,
     show: false,
     backgroundColor: '#00000000',
@@ -368,6 +368,16 @@ export const showPostureFloating = (preloadPath: string, opacity = DEFAULT_OPACI
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.setIgnoreMouseEvents(false);
   positionBottomRight(window);
+
+  window.on('close', (event) => {
+    event.preventDefault();
+  });
+
+  window.on('hide', () => {
+    if (!window.isDestroyed()) {
+      window.showInactive();
+    }
+  });
 
   window.on('closed', () => {
     if (floatingWindow === window) {

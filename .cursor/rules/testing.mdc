@@ -1,0 +1,52 @@
+---
+description: Universal testing rules applied to all ChatJuridico projects
+globs: **/*
+alwaysApply: true
+---
+
+# Testing Rules
+
+## Test Coverage
+
+- **Write tests for all new features** — no feature is complete without tests
+- Cover the happy path, at least one error path, and edge cases
+- For bug fixes, write a regression test that reproduces the bug before fixing it
+- Aim for meaningful coverage, not percentage theater — test behavior, not implementation
+
+## Test Naming
+
+- **Use descriptive test names that read as specifications**
+- Format: `should [expected behavior] when [condition]`
+- Examples:
+  - `should return 401 when token is expired`
+  - `should create contact with correct office_id when invitation code is valid`
+  - `should retry up to 3 times when SQS send fails`
+- Avoid generic names like `test1`, `test_function`, `it works`
+
+## Test Isolation
+
+- **Each test must be independent** — no shared mutable state between tests
+- Use fresh fixtures/factories for each test — never depend on execution order
+- Clean up side effects (database records, files, environment variables) in teardown
+- Tests must pass when run individually and in any order
+
+## Mocking External Services
+
+- **Mock all external service calls** (APIs, databases, message queues, email services)
+- Never make real HTTP calls in unit tests — use `jest.mock`, `unittest.mock`, `responses`, or `httpx.MockTransport`
+- Mock at the boundary: mock the HTTP client or SDK, not internal functions
+- Verify mock interactions: assert the correct endpoint, method, and payload were called
+
+## Test Organization
+
+- Mirror the source directory structure in test directories
+- Group related tests in describe/class blocks
+- Separate unit tests from integration tests — they have different execution requirements
+- Keep test files close to the code they test or in a parallel `tests/` directory
+
+## Assertions
+
+- **One logical assertion per test** — test one behavior, not five
+- Use specific assertions: `toEqual` over `toBeTruthy`, `assert response.status_code == 404` over `assert response`
+- For async operations, use proper async test utilities — no arbitrary `sleep` calls
+- Assert on the public API/output, not internal state

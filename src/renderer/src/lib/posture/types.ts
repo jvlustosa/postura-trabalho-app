@@ -22,6 +22,7 @@ export type PostureReason =
   | 'head-forward'
   | 'shoulder-tilt'
   | 'neck-tilt'
+  | 'neck-rotation'
   | 'slouch'
   | 'head-down';
 
@@ -36,6 +37,7 @@ export interface PostureMetrics {
   headOffset: number;
   shoulderTilt: number;
   neckTilt: number;
+  neckRotation: number;
   shoulderWidth: number;
   torsoAspectRatio: number;
   headVerticalRatio: number;
@@ -72,4 +74,8 @@ export interface PostureThresholds {
   hunchCompositeWarning: number;
   /** Average deficit across available signals that triggers composite bad */
   hunchCompositeBad: number;
+  /** Ear-nose distance asymmetry ratio (0=symmetric, 1=fully rotated) that triggers warning */
+  neckRotationWarning: number;
+  /** Ear-nose distance asymmetry ratio that triggers bad */
+  neckRotationBad: number;
 }

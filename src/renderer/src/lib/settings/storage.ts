@@ -97,6 +97,8 @@ const parseThresholds = (raw: unknown): PostureThresholds | null => {
       ? c.hunchCompositeWarning
       : 0.04,
     hunchCompositeBad: isFiniteNumber(c.hunchCompositeBad) ? c.hunchCompositeBad : 0.075,
+    neckRotationWarning: isFiniteNumber(c.neckRotationWarning) ? c.neckRotationWarning : 0.30,
+    neckRotationBad: isFiniteNumber(c.neckRotationBad) ? c.neckRotationBad : 0.52,
   };
 };
 
@@ -191,6 +193,10 @@ const parseSettings = (raw: unknown): AppSettings => {
     )
       ? (c.sharedCheckIntervalSeconds as SharedCheckIntervalSeconds)
       : defaultSettings.sharedCheckIntervalSeconds,
+    cameraDeviceId:
+      typeof c.cameraDeviceId === 'string' && c.cameraDeviceId.length > 0
+        ? c.cameraDeviceId
+        : defaultSettings.cameraDeviceId,
   };
 };
 

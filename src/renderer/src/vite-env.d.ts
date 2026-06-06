@@ -33,6 +33,11 @@ interface Window {
     showFloating?: () => void;
     openFloatingMenu?: () => void;
     quit?: () => void;
+    getAppInfo?: () => Promise<{ name: string; version: string; platform: string }>;
+    installUpdate?: () => Promise<boolean>;
+    onUpdateStatus?: (
+      cb: (payload: { status: string; version: string | null }) => void,
+    ) => () => void;
     window?: {
       minimize: () => void;
       toggleMaximize: () => void;

@@ -699,6 +699,144 @@ html {
   border-radius: 16px;
 }
 
+.button--tonal {
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+}
+
+.button--tonal:hover {
+  box-shadow: var(--md-elev-1);
+  background: color-mix(in srgb, var(--md-sys-color-secondary-container) 88%, white);
+  transform: translateY(-1px);
+}
+
+.hero__cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.section__cta-link {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+/* ─── Download page ─── */
+.download-page {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.download-hero {
+  padding: 48px 0 32px;
+  text-align: center;
+}
+
+.download-hero__title {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 12px 0 16px;
+}
+
+.download-hero__lead {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.download-hero__notice {
+  margin-top: 20px;
+  padding: 14px 18px;
+  border-radius: var(--md-shape-md);
+  background: var(--md-sys-color-surface-container);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.download-platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.download-platform {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px;
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-shape-lg);
+}
+
+.download-platform__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.download-platform__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.download-platform__btn {
+  width: 100%;
+}
+
+.download-platform__hint,
+.download-platform__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.download-fallback {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.download-upsell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 32px;
+  margin: 48px 0 32px;
+  border-radius: var(--md-shape-lg);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, var(--md-sys-color-surface-container-low));
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.download-upsell [data-lucide] {
+  width: 32px;
+  height: 32px;
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+
+.download-upsell__title {
+  margin: 0 0 6px;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.download-upsell__copy {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 /* ─── Steps ─── */
 .steps {
   display: grid;

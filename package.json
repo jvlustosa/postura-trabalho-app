@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "PosturaCerta — desktop posture checker with local webcam pose detection.",
   "homepage": "https://posturacerta.com",
-  "main": "out/main/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jvlustosa/postura-trabalho-app.git"
+  },
+  "main": "out/main/index.cjs",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run copy:mediapipe && npm run typecheck && electron-vite build",
@@ -51,7 +55,14 @@
         "to": "mediapipe"
       }
     ],
-    "publish": null,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jvlustosa",
+        "repo": "postura-trabalho-app",
+        "releaseType": "release"
+      }
+    ],
     "linux": {
       "target": [
         "AppImage",

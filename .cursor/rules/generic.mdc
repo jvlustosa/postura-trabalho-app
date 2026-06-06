@@ -1,0 +1,11 @@
+---
+description: Generic ChatJuridico repo (data, scripts, tooling) — follows central standards
+globs: **/*
+alwaysApply: true
+---
+
+# Generic ChatJuridico Project
+
+- Follow `chatjuridico-devkit/CLAUDE.md` and `~/.claude/CLAUDE.md` for all coding standards.
+- Match conventions in surrounding files before adding new patterns.
+- Minimal diff; no drive-by refactors.

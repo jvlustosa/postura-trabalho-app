@@ -4,7 +4,9 @@ MVP desktop local para Linux, Windows e macOS com Electron, React e detecção d
 
 ## Download
 
-Baixe a versão mais recente na página de [Releases](../../releases):
+**Mais fácil:** [posturacerta.com/download](https://posturacerta.com/download) — escolha Windows, Linux ou macOS e baixe com um clique.
+
+Ou acesse as [Releases](../../releases) no GitHub:
 
 | Plataforma | Arquivo | Tipo |
 |------------|---------|------|

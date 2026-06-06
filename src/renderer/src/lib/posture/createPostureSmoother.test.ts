@@ -12,6 +12,7 @@ const analysis = (state: PostureAnalysis['state']): PostureAnalysis => ({
     headOffset: 0,
     shoulderTilt: 0,
     neckTilt: 0,
+    neckRotation: 0,
     shoulderWidth: 0.22,
     torsoAspectRatio: 0,
     headVerticalRatio: 0,

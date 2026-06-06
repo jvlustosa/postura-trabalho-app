@@ -1,0 +1,51 @@
+---
+description: Universal code quality rules applied to all ChatJuridico projects
+globs: **/*
+alwaysApply: true
+---
+
+# Code Quality Rules
+
+## Type Safety
+
+- **Enable TypeScript strict mode** in all TypeScript projects (`"strict": true` in tsconfig)
+- Use explicit types for function parameters and return values — avoid `any`
+- Use `unknown` instead of `any` when the type is genuinely unknown, then narrow with type guards
+- In Python, use type hints on all function signatures — `def process(data: dict[str, Any]) -> Result:`
+
+## Error Handling
+
+- **No silent catches** — every `catch` block must log, re-throw, or handle the error meaningfully
+- Never use empty `catch` blocks or `except: pass`
+- Use structured error responses with consistent shapes (`{ error: string, code: string }`)
+- Distinguish between expected errors (user input) and unexpected errors (system failures)
+- In async code, always handle promise rejections — no unhandled promises
+
+## Naming Conventions
+
+- **Use meaningful, descriptive variable names** — `userSubscription` not `sub`, `messageCount` not `n`
+- Functions should describe their action: `fetchContactsByOffice`, `validatePaymentData`
+- Boolean variables start with `is`, `has`, `should`, `can`: `isAuthenticated`, `hasPermission`
+- Constants in UPPER_SNAKE_CASE: `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT_MS`
+- No single-letter variables except in trivial loops (`i`, `j`) or lambda/comprehension variables
+
+## Logging
+
+- **No `console.log` in production code** — use structured logging (Python: `structlog`/`logging`, TypeScript: dedicated logger)
+- Debug logs are acceptable during development but must be removed before merge
+- Log at appropriate levels: ERROR for failures, WARN for degraded states, INFO for business events, DEBUG for development
+- Include context in log messages: request ID, user ID, operation name
+
+## Code Structure
+
+- **Prefer composition over inheritance** — use mixins, hooks, or utility functions
+- Keep functions under 50 lines — if longer, extract helper functions
+- Single Responsibility: each function/class/module does one thing well
+- Avoid deep nesting (>3 levels) — use early returns, guard clauses
+- DRY within reason — extract shared logic, but don't over-abstract prematurely
+
+## Formatting
+
+- Follow project-specific formatters (Prettier for JS/TS, Black/Ruff for Python)
+- Consistent import ordering: stdlib → third-party → local, separated by blank lines
+- No commented-out code in commits — use version control to retrieve old code

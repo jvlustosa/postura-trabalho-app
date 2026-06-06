@@ -1,0 +1,42 @@
+---
+description: Lessons learned from production integrations — Slack, Supabase, LLM eval, deploy. Apply when working with external services.
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Integration Best Practices
+
+## Slack
+
+- Webhook does NOT support channel override. Use Bot Token API (`chat.postMessage`) for dynamic channels
+- Buttons in `actions` blocks require Interactivity URL. Use mrkdwn links in `context` blocks instead
+- Channel names reject underscores. Sanitize: `sdr_v3` → `sdr-v3` via `.replace('_', '-')`
+- Bot must be `/invite`d to each channel before posting
+
+## Supabase / Database
+
+- GENERATED columns reject INSERT. Omit them from payloads (e.g. computed scores)
+- Know the schema before inserting — validate column names against the actual table, never assume
+- `.in()` does NOT accept query builders as subqueries — always pass a plain array
+
+## LLM Evaluation (G-Eval)
+
+- Client silence != dissatisfaction. Instruct model: "assume neutral 5-6 if no explicit feedback"
+- Few-shot anchors must come from real production data, not invented examples
+- LLM scores dimensions; Python computes weighted overall score. Never let the LLM assign the final score
+
+## URLs and External References
+
+- Validate URLs against the real system before hardcoding
+- SSM naming: `/{service}-{stage}-{param}`. Copy pattern from existing parameters
+
+## Tests
+
+- If test describes correct UX behavior, fix the code (e.g. message splitter merge logic)
+- If production code evolved legitimately, fix the test assertion
+- Mocks must support the full query API chain (e.g. `.not_.is_()` for Supabase filters)
+
+## Deploy
+
+- Local changes do NOT affect Lambda. Redeploy before validating any change
+- All messages visible to users must be in PT-BR

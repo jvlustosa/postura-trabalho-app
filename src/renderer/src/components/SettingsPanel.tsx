@@ -15,6 +15,7 @@ import {
   Download,
   Focus,
   Settings2,
+  Shield,
   Trash2,
 } from 'lucide-react';
 
@@ -480,6 +481,11 @@ export const SettingsPanel = ({
           </div>
         </div>
 
+        <CameraDevicePicker
+          selectedDeviceId={settings.cameraDeviceId}
+          onChange={(deviceId) => onChange({ cameraDeviceId: deviceId })}
+        />
+
         <ToggleRow
           label="Espelhar vídeo"
           hint="Mostra a imagem invertida como se fosse um espelho."
@@ -560,6 +566,10 @@ export const SettingsPanel = ({
         </div>
       </SettingsSection>
 
+      <SettingsSection icon={Shield} title="Sobre" hint="Versão e privacidade.">
+        <AboutPanel />
+      </SettingsSection>
+
       <div className="settings-card__footer">
         <button
           className="settings-subtle-link"
@@ -617,6 +627,40 @@ const SettingsSection = ({
   </section>
 );
 
+const AboutPanel = (): ReactElement => {
+  const [appInfo, setAppInfo] = useState<{ name: string; version: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.postureApp?.getAppInfo?.().then((info) => {
+      if (!cancelled) setAppInfo(info);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <>
+      <div className="settings-row">
+        <div className="settings-row__text">
+          <span className="settings-row__label">Versão</span>
+          <span className="settings-row__hint">
+            {appInfo ? `${appInfo.name} ${appInfo.version}` : 'Carregando…'}
+          </span>
+        </div>
+      </div>
+      <p className="privacy-note">
+        Toda análise de postura roda localmente no seu computador. Nenhuma imagem da webcam é
+        enviada para servidores. Histórico e configurações ficam apenas neste dispositivo.{' '}
+        <a href="https://posturacerta.com/download#ajuda" target="_blank" rel="noopener noreferrer">
+          Guia de instalação e ajuda
+        </a>
+      </p>
+    </>
+  );
+};
+
 const formatCalibratedAt = (iso: string): string => {
   const date = new Date(iso);
 
@@ -631,6 +675,115 @@ const formatCalibratedAt = (iso: string): string => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+};
+
+interface CameraDevicePickerProps {
+  selectedDeviceId: string | null;
+  onChange: (deviceId: string | null) => void;
+}
+
+const looksLikeVirtualCamera = (label: string): boolean => {
+  const l = label.toLowerCase();
+  return (
+    l.includes('virtual') ||
+    l.includes('obs') ||
+    l.includes('v4l2loopback') ||
+    l.includes('loopback') ||
+    l.includes('dummy')
+  );
+};
+
+const CameraDevicePicker = ({
+  selectedDeviceId,
+  onChange,
+}: CameraDevicePickerProps): ReactElement => {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'denied' | 'unsupported'>('loading');
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      setStatus('unsupported');
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async (): Promise<void> => {
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        const cams = list.filter((d) => d.kind === 'videoinput');
+        setDevices(cams);
+        setStatus(cams.some((d) => !d.label) ? 'denied' : 'ready');
+      } catch {
+        if (!cancelled) setStatus('denied');
+      }
+    };
+
+    void load();
+
+    const onDeviceChange = (): void => {
+      void load();
+    };
+    navigator.mediaDevices.addEventListener?.('devicechange', onDeviceChange);
+
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.('devicechange', onDeviceChange);
+    };
+  }, []);
+
+  const grantAndReload = async (): Promise<void> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      stream.getTracks().forEach((t) => t.stop());
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const cams = list.filter((d) => d.kind === 'videoinput');
+      setDevices(cams);
+      setStatus('ready');
+    } catch {
+      setStatus('denied');
+    }
+  };
+
+  const virtualCount = devices.filter((d) => looksLikeVirtualCamera(d.label)).length;
+
+  return (
+    <div className="settings-group" role="group" aria-label="Dispositivo de câmera">
+      <div className="settings-group__head">
+        <span className="settings-group__label">Dispositivo</span>
+        <span className="settings-group__hint">
+          Use uma câmera virtual (OBS, v4l2loopback) pra compartilhar a webcam com o Meet sem briga.
+          {virtualCount > 0 ? ' Detectamos câmera virtual disponível.' : ''}
+        </span>
+      </div>
+      {status === 'unsupported' ? (
+        <p className="settings-group__hint">Seleção de dispositivo indisponível neste sistema.</p>
+      ) : status === 'denied' ? (
+        <button type="button" className="button button--text" onClick={() => void grantAndReload()}>
+          Liberar acesso pra listar câmeras
+        </button>
+      ) : (
+        <select
+          className="settings-select"
+          value={selectedDeviceId ?? ''}
+          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+          aria-label="Câmera selecionada"
+        >
+          <option value="">Automática (padrão do sistema)</option>
+          {devices.map((d) => {
+            const baseLabel = d.label || `Câmera ${d.deviceId.slice(0, 6)}`;
+            const label = looksLikeVirtualCamera(d.label) ? `${baseLabel} (virtual)` : baseLabel;
+            return (
+              <option key={d.deviceId} value={d.deviceId}>
+                {label}
+              </option>
+            );
+          })}
+        </select>
+      )}
+    </div>
+  );
 };
 
 interface ToggleRowProps {

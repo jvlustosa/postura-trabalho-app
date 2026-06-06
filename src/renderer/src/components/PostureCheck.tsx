@@ -1,5 +1,5 @@
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, EyeOff, Flame, Maximize2, Pause, PictureInPicture2, RotateCcw, UserX } from 'lucide-react';
+import { Camera, EyeOff, Maximize2, Pause, PictureInPicture2, RotateCcw, UserX } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
 import type { MiniView } from '../App';
@@ -36,10 +36,15 @@ const UPRIGHT_SAMPLE_LIMITS = {
 };
 const MIN_CALIBRATION_SAMPLES = 5;
 
-const POSTURE_CHECK_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
-  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 60 } },
+const buildPostureCheckConstraints = (deviceId: string | null): MediaStreamConstraints => ({
+  video: {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30, max: 60 },
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  },
   audio: false,
-};
+});
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
@@ -60,6 +65,8 @@ const scaleThresholds = (thresholds: PostureThresholds, multiplier: number): Pos
   hunchSignificantDeficit: thresholds.hunchSignificantDeficit * multiplier,
   hunchCompositeWarning: thresholds.hunchCompositeWarning * multiplier,
   hunchCompositeBad: thresholds.hunchCompositeBad * multiplier,
+  neckRotationWarning: thresholds.neckRotationWarning * multiplier,
+  neckRotationBad: thresholds.neckRotationBad * multiplier,
 });
 
 const isUprightSample = (metrics: PostureAnalysis['metrics']): boolean =>
@@ -71,7 +78,7 @@ const initialAnalysis: PostureAnalysis = {
   score: 0,
   reasons: [],
   message: 'Preparando câmera',
-  metrics: { headOffset: 0, shoulderTilt: 0, neckTilt: 0, shoulderWidth: 0, torsoAspectRatio: 0, headVerticalRatio: 0 },
+  metrics: { headOffset: 0, shoulderTilt: 0, neckTilt: 0, neckRotation: 0, shoulderWidth: 0, torsoAspectRatio: 0, headVerticalRatio: 0 },
 };
 
 const statusLabels: Record<PostureState, string> = {
@@ -100,6 +107,7 @@ const hintFor = (analysis: PostureAnalysis, awaitingUpright: boolean): string | 
   if (analysis.state === 'good') return null;
   if (analysis.reasons.includes('slouch')) return 'Endireite as costas';
   if (analysis.reasons.includes('head-down')) return 'Levante a cabeça';
+  if (analysis.reasons.includes('neck-rotation')) return 'Centralize o olhar — vire o monitor, não o pescoço';
   if (analysis.reasons.includes('head-forward')) return 'Recue a cabeça';
   if (analysis.reasons.includes('neck-tilt')) return 'Alinhe a cabeça com os ombros';
   if (analysis.reasons.includes('shoulder-tilt')) return 'Nivele os ombros';
@@ -160,6 +168,30 @@ const buildSparklineSegments = (
   return segments;
 };
 
+const BlueFlameSVG = ({ size = 16 }: { size?: number }): ReactElement => (
+  <svg
+    className="blue-flame-svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    aria-hidden="true"
+    fill="none"
+  >
+    <path
+      className="bfs-outer"
+      d="M12 4C14 6 18.5 10 18.5 14.5C18.5 18.5 15.5 21 12 21C8.5 21 5.5 18.5 5.5 14.5C5.5 10 10 6 12 4Z"
+    />
+    <path
+      className="bfs-mid"
+      d="M12 8C13.5 10 16 12.5 16 15.5C16 18 14.2 20 12 20C9.8 20 8 18 8 15.5C8 12.5 10.5 10 12 8Z"
+    />
+    <path
+      className="bfs-core"
+      d="M12 12C12.8 13.5 14 14.5 14 16.5C14 17.8 13.1 18.5 12 18.5C10.9 18.5 10 17.8 10 16.5C10 14.5 11.2 13.5 12 12Z"
+    />
+  </svg>
+);
+
 export const PostureCheck = ({
   onStop,
   settings,
@@ -194,6 +226,7 @@ export const PostureCheck = ({
   const alertSoundRef = useRef(settings.alertSound);
   const cameraModeRef = useRef(settings.cameraMode);
   const sharedIntervalMsRef = useRef(settings.sharedCheckIntervalSeconds * 1_000);
+  const cameraDeviceIdRef = useRef<string | null>(settings.cameraDeviceId);
 
   const cycleStateRef = useRef<CycleState>(
     settings.cameraMode === 'shared' ? 'sampling' : 'continuous',
@@ -255,7 +288,15 @@ export const PostureCheck = ({
   const [scoreHistory, setScoreHistory] = useState<ScoreSample[]>([]);
   const [sharedIdleUntil, setSharedIdleUntil] = useState<number | null>(null);
   const [sharedNow, setSharedNow] = useState(() => Date.now());
+  const [cameraBusyPaused, setCameraBusyPaused] = useState(false);
   const diagnosticCaptureRef = useRef<{ error?: unknown; stream?: MediaStream | null }>({});
+
+  const resumeFromBusy = useCallback((): void => {
+    setCameraBusyPaused(false);
+    setErrorDetails(null);
+    setAnalysis(initialAnalysis);
+    restartCameraRef.current?.();
+  }, []);
 
   useEffect(() => {
     if (sharedIdleUntil === null) return;
@@ -271,7 +312,7 @@ export const PostureCheck = ({
         surface: 'posture-check',
         uiMessage: analysis.message,
         analysisState: analysis.state,
-        constraints: POSTURE_CHECK_MEDIA_CONSTRAINTS,
+        constraints: buildPostureCheckConstraints(cameraDeviceIdRef.current),
         video: videoRef.current,
         stream: stream ?? streamRef.current,
       });
@@ -323,6 +364,14 @@ export const PostureCheck = ({
   useEffect(() => {
     sharedIntervalMsRef.current = settings.sharedCheckIntervalSeconds * 1_000;
   }, [settings.sharedCheckIntervalSeconds]);
+
+  useEffect(() => {
+    const prev = cameraDeviceIdRef.current;
+    cameraDeviceIdRef.current = settings.cameraDeviceId;
+    if (prev === settings.cameraDeviceId) return;
+    if (cameraBusyPaused) return;
+    restartCameraRef.current?.();
+  }, [settings.cameraDeviceId, cameraBusyPaused]);
 
   useEffect(() => {
     const prev = cameraModeRef.current;
@@ -410,15 +459,6 @@ export const PostureCheck = ({
 
   useEffect(() => {
     let cancelled = false;
-    let busyRetryTimeout: number | null = null;
-    let busyAttempts = 0;
-
-    const clearBusyRetry = (): void => {
-      if (busyRetryTimeout !== null) {
-        window.clearTimeout(busyRetryTimeout);
-        busyRetryTimeout = null;
-      }
-    };
 
     const stopStream = (): void => {
       streamRef.current?.getTracks().forEach((t) => {
@@ -511,6 +551,14 @@ export const PostureCheck = ({
         if (isCalibratedRef.current) {
           awaySinceRef.current ??= now;
           postureWatcher.observe('away', []);
+          setAnalysis({
+            state: 'away',
+            score: 0,
+            reasons: [],
+            message: 'Você saiu da câmera. Volte quando estiver pronto.',
+            metrics: rawAnalysis.metrics,
+          });
+          pushFloating('away', 0, 'Fora da tela');
           if (now - awaySinceRef.current >= AWAY_GRACE_MS) {
             smoother.reset();
             if (streakStartRef.current !== null) {
@@ -519,14 +567,6 @@ export const PostureCheck = ({
             }
             timelineRecorder.flush(now);
             setAwaitingUpright(false);
-            setAnalysis({
-              state: 'away',
-              score: 0,
-              reasons: [],
-              message: 'Você saiu da câmera. Volte quando estiver pronto.',
-              metrics: rawAnalysis.metrics,
-            });
-            pushFloating('away', 0, 'Fora da tela');
           }
           return;
         }
@@ -647,16 +687,12 @@ export const PostureCheck = ({
       }
     };
 
-    const scheduleBusyRetry = (): void => {
-      if (cancelled) return;
-      clearBusyRetry();
-      busyAttempts += 1;
-      const delayMs = Math.min(15_000, 1500 + busyAttempts * 1000);
-      busyRetryTimeout = window.setTimeout(() => {
-        busyRetryTimeout = null;
-        if (cancelled) return;
-        void start();
-      }, delayMs);
+    const enterBusyPaused = (message: string): void => {
+      diagnosticCaptureRef.current = { stream: null };
+      setErrorDetails(null);
+      setCameraBusyPaused(true);
+      setAnalysis({ ...initialAnalysis, state: 'camera-error', message });
+      pushFloating('camera-error', 0, 'Câmera ocupada');
     };
 
     const start = async (): Promise<void> => {
@@ -665,22 +701,18 @@ export const PostureCheck = ({
       let stream: MediaStream;
 
       try {
-        stream = await navigator.mediaDevices.getUserMedia(POSTURE_CHECK_MEDIA_CONSTRAINTS);
+        stream = await navigator.mediaDevices.getUserMedia(
+          buildPostureCheckConstraints(cameraDeviceIdRef.current),
+        );
       } catch (error) {
         const kind = classifyMediaError(error);
         console.warn('[posture-check] camera error', kind, error);
         if (cancelled) return;
 
         if (kind === 'camera-in-use') {
-          diagnosticCaptureRef.current = { error, stream: null };
-          setErrorDetails(null);
-          setAnalysis({
-            ...initialAnalysis,
-            state: 'camera-error',
-            message: 'Câmera em uso por outro app. Aguardando ficar livre…',
-          });
-          pushFloating('camera-error', 0, 'Câmera ocupada');
-          scheduleBusyRetry();
+          enterBusyPaused(
+            'Câmera em uso por outro app (ex.: Google Meet). Clique em Retomar quando a reunião acabar.',
+          );
           return;
         }
 
@@ -696,21 +728,14 @@ export const PostureCheck = ({
         return;
       }
 
-      busyAttempts = 0;
-      clearBusyRetry();
-
       stream.getTracks().forEach((t) => {
         t.onended = (): void => {
           if (cancelled) return;
-          console.warn('[posture-check] camera track ended — yielding & retrying');
+          console.warn('[posture-check] camera track ended — another app took the camera');
           stopStream();
-          setAnalysis({
-            ...initialAnalysis,
-            state: 'camera-error',
-            message: 'Câmera tomada por outro app. Aguardando ficar livre…',
-          });
-          pushFloating('camera-error', 0, 'Câmera ocupada');
-          scheduleBusyRetry();
+          enterBusyPaused(
+            'Outro app pegou a câmera (ex.: Google Meet). Clique em Retomar quando estiver livre.',
+          );
         };
       });
 
@@ -779,7 +804,6 @@ export const PostureCheck = ({
 
     return () => {
       cancelled = true;
-      clearBusyRetry();
       if (idleTimeoutRef.current !== null) {
         window.clearTimeout(idleTimeoutRef.current);
         idleTimeoutRef.current = null;
@@ -816,6 +840,7 @@ export const PostureCheck = ({
   const isError = analysis.state === 'camera-error' || analysis.state === 'model-error';
   const isAway = analysis.state === 'away';
   const isActive = analysis.state === 'good' || analysis.state === 'warning' || analysis.state === 'bad';
+  const isOnFire = streakMs >= 30_000;
   const isSharedIdle = sharedIdleUntil !== null;
   const sharedRemainingSec = isSharedIdle
     ? Math.max(0, Math.ceil(((sharedIdleUntil ?? 0) - sharedNow) / 1_000))
@@ -842,6 +867,7 @@ export const PostureCheck = ({
         { label: 'Cabeça centralizada', ok: !analysis.reasons.includes('head-forward') },
         { label: 'Ombros nivelados', ok: !analysis.reasons.includes('shoulder-tilt') },
         { label: 'Pescoço alinhado', ok: !analysis.reasons.includes('neck-tilt') },
+        { label: 'Pescoço de frente', ok: !analysis.reasons.includes('neck-rotation') },
         { label: 'Costas eretas', ok: !analysis.reasons.includes('slouch') },
         { label: 'Cabeça erguida', ok: !analysis.reasons.includes('head-down') },
       ]
@@ -855,13 +881,14 @@ export const PostureCheck = ({
   if (isMini) {
     return (
       <section
-        className={`mini-panel mini-panel--${miniView} status-${analysis.state}`}
+        className={`mini-panel mini-panel--${miniView} status-${analysis.state}${isOnFire ? ' mini-panel--on-fire' : ''}`}
         aria-live="polite"
       >
         <div
           ref={cameraStageRef}
-          className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}${miniViewClass}`}
+          className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}${miniViewClass}${isOnFire ? ' camera-stage--on-fire' : ''}`}
         >
+          {isOnFire ? <div className="fire-overlay fire-overlay--mini" aria-hidden="true" /> : null}
           <div className="camera-stage__inner">
             <video
               ref={videoRef}
@@ -921,21 +948,26 @@ export const PostureCheck = ({
 
           {analysis.state === 'good' && streakMs >= 1000 ? (
             <div className="mini-streak" aria-label={`Streak ${formatStreak(streakMs)}`}>
-              <Flame size={11} aria-hidden="true" />
+              <BlueFlameSVG size={11} />
               <span>{formatStreak(streakMs)}</span>
             </div>
           ) : null}
 
           {isError ? (
-            <p className="mini-error" role="alert">
-              {analysis.message}
-            </p>
+            <div className="mini-error" role="alert">
+              <p className="mini-error__message">{analysis.message}</p>
+              {cameraBusyPaused ? (
+                <button type="button" className="mini-error__resume" onClick={resumeFromBusy}>
+                  Retomar
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {isAway ? (
             <div className="mini-away" role="status" aria-live="polite">
-              <UserX size={14} aria-hidden="true" />
-              <span>Fora da tela</span>
+              <UserX size={26} className="mini-away__icon" aria-hidden="true" />
+              <span className="mini-away__label">Não detectado</span>
             </div>
           ) : null}
 
@@ -990,8 +1022,9 @@ export const PostureCheck = ({
 
       <div
         ref={cameraStageRef}
-        className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}`}
+        className={`camera-stage${settings.mirrorVideo ? ' camera-stage--mirrored' : ''}${isOnFire ? ' camera-stage--on-fire' : ''}`}
       >
+        {isOnFire ? <div className="fire-overlay" aria-hidden="true" /> : null}
         <video ref={videoRef} className="camera-preview" muted playsInline />
         <canvas
           ref={overlayRef}
@@ -1005,10 +1038,10 @@ export const PostureCheck = ({
         ) : null}
         {isAway ? (
           <div className="away-banner" role="status" aria-live="polite">
-            <UserX size={28} aria-hidden="true" />
+            <UserX size={48} className="away-banner__icon" aria-hidden="true" />
             <div className="away-banner__text">
-              <strong className="away-banner__title">Você saiu da câmera</strong>
-              <span className="away-banner__hint">Monitoramento pausado. Volte quando estiver pronto.</span>
+              <strong className="away-banner__title">Não detectado</strong>
+              <span className="away-banner__hint">Volte para a câmera para retomar o monitoramento.</span>
             </div>
           </div>
         ) : null}
@@ -1036,8 +1069,8 @@ export const PostureCheck = ({
           </div>
         ) : null}
         {isActive && analysis.state === 'good' && streakMs >= 1000 ? (
-          <div className="streak-pill" aria-live="polite" aria-label={`Streak de postura ${formatStreak(streakMs)}`}>
-            <Flame size={16} aria-hidden="true" />
+          <div className={`streak-pill${isOnFire ? ' streak-pill--fire' : ''}`} aria-live="polite" aria-label={`Streak de postura ${formatStreak(streakMs)}`}>
+            <BlueFlameSVG size={16} />
             <span className="streak-pill__label">Streak</span>
             <span className="streak-pill__time">{formatStreak(streakMs)}</span>
           </div>
@@ -1084,9 +1117,15 @@ export const PostureCheck = ({
         <div className="error-note" role="alert">
           <p className="error-note__message">{analysis.message}</p>
           <div className="error-note__actions">
-            <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
-              Copiar logs detalhados
-            </button>
+            {cameraBusyPaused ? (
+              <button type="button" className="button button--filled" onClick={resumeFromBusy}>
+                Retomar
+              </button>
+            ) : (
+              <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
+                Copiar logs detalhados
+              </button>
+            )}
             {copyDiagFeedback === 'copied' ? (
               <span className="error-note__feedback" aria-live="polite">
                 Copiado para a área de transferência
@@ -1098,7 +1137,7 @@ export const PostureCheck = ({
               </span>
             ) : null}
           </div>
-          {errorDetails ? (
+          {!cameraBusyPaused && errorDetails ? (
             <details className="error-note__details">
               <summary>Resumo do erro (copiar)</summary>
               <pre className="error-note__pre">{errorDetails}</pre>

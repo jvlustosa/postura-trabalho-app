@@ -1,0 +1,49 @@
+---
+description: Universal documentation rules applied to all ChatJuridico projects
+globs: **/*
+alwaysApply: true
+---
+
+# Documentation Rules
+
+## Public API Documentation
+
+- **Document all public functions, classes, and API endpoints**
+- Include parameter types, return types, and possible exceptions/errors
+- Provide at least one usage example for non-trivial APIs
+- For REST endpoints: document method, path, request body schema, response schema, and error codes
+
+## README Maintenance
+
+- **Update README when adding features, changing setup steps, or modifying architecture**
+- README must always contain: project purpose, setup instructions, environment variables, and how to run
+- Keep the README concise — link to detailed docs instead of bloating it
+- If a README section becomes outdated, fix it immediately rather than leaving stale info
+
+## Changelogs
+
+- **Maintain a changelog for user-facing projects** (SaaS products, APIs, packages)
+- Follow Keep a Changelog format: Added, Changed, Deprecated, Removed, Fixed, Security
+- Write entries from the user's perspective, not the developer's
+- Link changelog entries to relevant PRs or issues when possible
+
+## Architecture Decision Records (ADRs)
+
+- **Document significant architecture decisions in ADRs**
+- Use ADRs for: technology choices, pattern adoptions, breaking changes, infrastructure decisions
+- ADR format: Title, Status (proposed/accepted/deprecated), Context, Decision, Consequences
+- Store ADRs in `docs/adr/` or the project's documentation directory
+- Never delete ADRs — supersede them with new ones that reference the original
+
+## Code Comments
+
+- **Comments explain "why", not "what"** — the code itself shows what it does
+- Document non-obvious business rules, regulatory requirements, or workarounds
+- Use TODO/FIXME with ticket references: `TODO(CJ-123): migrate to new API after v2 launch`
+- Remove stale comments during code review — outdated comments are worse than none
+
+## Language
+
+- **Code and technical docs in English** — variable names, function names, comments, commit messages
+- **User-facing content in Portuguese (pt-BR)** — UI text, blog posts, help articles, error messages shown to end users
+- API documentation in English unless targeting exclusively Brazilian developers

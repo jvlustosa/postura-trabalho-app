@@ -45,6 +45,7 @@ const buildHtml = (level: AlertLevel, message: string): string => {
       html, body {
         margin: 0;
         height: 100%;
+        overflow: hidden;
         font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
         color: #f7fafa;
         background: transparent;

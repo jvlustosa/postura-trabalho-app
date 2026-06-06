@@ -1,0 +1,54 @@
+---
+description: Universal security rules applied to all ChatJuridico projects
+globs: **/*
+alwaysApply: true
+---
+
+# Security Rules
+
+## Secrets & Credentials
+
+- **Never hardcode secrets, API keys, tokens, or passwords** in source code
+- Store all secrets in environment variables or secret managers (AWS Secrets Manager, `.env` files)
+- `.env` files must be in `.gitignore` — verify before every commit
+- Use placeholder values in example configs: `YOUR_API_KEY_HERE`, never real values
+- If you detect a hardcoded secret during code review, flag it immediately and refuse to proceed
+
+## Input Validation
+
+- **Validate all user inputs** at the boundary (API handler, form submission, webhook receiver)
+- Never trust client-side validation alone — always re-validate server-side
+- Sanitize strings before interpolation into HTML, SQL, or shell commands
+- Reject unexpected types early: check `typeof`, use Pydantic models (Python) or Zod schemas (TypeScript)
+
+## Database Security
+
+- **Use parameterized queries exclusively** — never concatenate user input into SQL strings
+- When using Supabase, rely on Row Level Security (RLS) policies for authorization
+- Never expose service role keys to the client — use anon keys with RLS
+- Audit all database functions for SQL injection vectors
+
+## Authentication & Authorization
+
+- **Enforce authentication on every endpoint** unless explicitly public
+- Check authorization (role, ownership) after authentication — authn != authz
+- Use short-lived tokens (JWTs with reasonable expiry)
+- Never store passwords in plaintext — use bcrypt or Supabase Auth
+- Log authentication failures for monitoring
+
+## LGPD Compliance
+
+- **All projects handle Brazilian user data and must comply with LGPD** (Lei Geral de Proteção de Dados)
+- Collect only necessary personal data — data minimization principle
+- Provide clear consent mechanisms before collecting personal data
+- Support data subject rights: access, correction, deletion, portability
+- Log data processing activities for audit trails
+- Encrypt personal data at rest and in transit (TLS everywhere)
+
+## API Security
+
+- Rate-limit all public endpoints
+- Use CORS policies — never allow `*` in production
+- Validate Content-Type headers on all request bodies
+- Return generic error messages to clients — log detailed errors server-side only
+- Never expose stack traces, internal paths, or debug info in production responses

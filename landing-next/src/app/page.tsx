@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+
+import { WA_LINK } from '@/lib/site'
 import {
   Home,
   ShieldCheck,
@@ -18,9 +20,6 @@ import {
   Check,
   ChevronDown,
 } from 'lucide-react'
-
-const WA_LINK =
-  'https://wa.me/5512982218937?text=Tenho%20interesse%20no%20plano%20vital%C3%ADcio'
 
 export const metadata: Metadata = {
   title: 'PosturaCerta · Postura correta no home office sem ficar se policiando',
@@ -58,7 +57,8 @@ const jsonLd = {
   description:
     'App desktop que monitora sua postura no home office usando a webcam e avisa quando você escorrega. 100% local, sem nuvem.',
   applicationCategory: 'HealthApplication',
-  operatingSystem: 'Windows, Linux',
+  operatingSystem: 'Windows, Linux, macOS',
+  downloadUrl: 'https://posturacerta.com/download',
   offers: {
     '@type': 'Offer',
     price: '149.00',
@@ -142,20 +142,20 @@ const PLATFORMS = [
   {
     cssClass: 'brand-icon--apple',
     title: 'macOS',
-    copy: 'Em desenvolvimento. Quando sair, sua licença atual já habilita, sem pagar de novo.',
+    copy: 'DMG para Intel e Apple Silicon. Na primeira abertura o macOS pode pedir confirmação extra.',
   },
 ] as const
 
 const HOW_IT_WORKS = [
   {
     Icon: Download,
-    title: 'Compra e receba no e-mail',
-    copy: 'Você fecha com a gente (hoje pelo WhatsApp) e recebe instalador e chave na caixa de entrada logo após a confirmação.',
+    title: 'Baixe grátis',
+    copy: 'Escolha Windows, Linux ou macOS na página de download. Sem conta, sem cadastro.',
   },
   {
     Icon: Camera,
     title: 'Calibra em um instante',
-    copy: 'Sente na posição em que trabalha bem; em poucos segundos o app registra esse alinhamento como referência.',
+    copy: 'Permita a câmera e sente como trabalha de verdade. Em menos de 2 minutos o app aprende sua postura.',
   },
   {
     Icon: Briefcase,
@@ -173,6 +173,10 @@ const PRICE_FEATURES = [
 ] as const
 
 const FAQ = [
+  {
+    q: 'Posso testar antes de pagar?',
+    a: 'Sim. Baixe grátis em posturacerta.com/download, use à vontade e só garanta o vitalício se fizer sentido para você.',
+  },
   {
     q: 'É vitalício mesmo?',
     a: 'Sim: um único pagamento de R$ 149 e a licença permanece válida para você, com melhorias e correções futuras incluídas enquanto mantivermos o produto ativo.',
@@ -217,6 +221,7 @@ export default function LandingPage() {
             <a className="app-bar__link" href="#como-funciona">Como funciona</a>
             <a className="app-bar__link" href="#preco">Investimento</a>
             <Link className="app-bar__link" href="/blog">Blog</Link>
+            <Link className="app-bar__link" href="/download">Baixar</Link>
             <a
               className="button button--filled app-bar__cta"
               href={WA_LINK}
@@ -248,17 +253,23 @@ export default function LandingPage() {
               </p>
 
               <div className="hero__cta">
-                <a
-                  className="button button--filled button--cta"
-                  href={WA_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Check aria-hidden="true" />
-                  <span>Quero o vitalício por R$ 149</span>
-                </a>
+                <div className="hero__cta-row">
+                  <Link className="button button--filled button--cta" href="/download">
+                    <Download aria-hidden="true" />
+                    <span>Baixar grátis</span>
+                  </Link>
+                  <a
+                    className="button button--tonal button--cta"
+                    href={WA_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Check aria-hidden="true" />
+                    <span>Vitalício · R$ 149</span>
+                  </a>
+                </div>
                 <p className="hero__hint">
-                  Pagamento único, uso vitalício. Windows e Linux hoje; macOS na mesma licença quando lançar.
+                  Teste sem pagar. Windows, Linux e macOS. Licença vitalícia opcional depois.
                 </p>
               </div>
 
@@ -359,8 +370,7 @@ export default function LandingPage() {
                 Um app nativo em cada sistema
               </h3>
               <p className="section__subtitle">
-                A mesma licença vale para o ecossistema que você usa hoje e para o macOS assim que
-                a build estiver pronta.
+                Baixe o instalador do seu sistema e comece em minutos.
               </p>
             </header>
 
@@ -376,6 +386,12 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+            <p className="section__cta-link">
+              <Link className="button button--filled" href="/download">
+                <Download aria-hidden="true" />
+                <span>Ir para download</span>
+              </Link>
+            </p>
           </section>
 
           {/* ── How it works ── */}
@@ -493,6 +509,7 @@ export default function LandingPage() {
               <span>PosturaCerta · © 2026</span>
             </div>
             <div className="app-foot__links">
+              <Link href="/download">Baixar</Link>
               <a href="#preco">Investimento</a>
               <a href="#duvidas">Dúvidas</a>
               <Link href="/blog">Blog</Link>

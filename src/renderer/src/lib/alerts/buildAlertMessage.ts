@@ -20,6 +20,10 @@ export const reasonMessages: Record<PostureReason, { warning: string; bad: strin
     warning: 'Pescoço levemente inclinado. Alinhe a cabeça.',
     bad: 'Seu pescoço está muito inclinado. Corrija a posição.',
   },
+  'neck-rotation': {
+    warning: 'Pescoço virado para o lado. Centralize o olhar.',
+    bad: 'Pescoço muito girado. Reposicione o monitor lateral.',
+  },
   slouch: {
     warning: 'Você está curvando levemente as costas. Endireite-se.',
     bad: 'Suas costas estão muito curvadas. Sente-se ereto agora.',

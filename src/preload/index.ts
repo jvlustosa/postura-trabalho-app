@@ -49,6 +49,25 @@ contextBridge.exposeInMainWorld('postureApp', {
   quit: (): void => {
     ipcRenderer.send('app:quit');
   },
+  getAppInfo: (): Promise<{ name: string; version: string; platform: string }> =>
+    ipcRenderer.invoke('app:get-info'),
+  installUpdate: (): Promise<boolean> => ipcRenderer.invoke('app:install-update'),
+  onUpdateStatus: (
+    cb: (payload: { status: string; version: string | null }) => void,
+  ): (() => void) => {
+    const listener = (_event: unknown, payload: unknown): void => {
+      if (typeof payload !== 'object' || payload === null) return;
+      const { status, version } = payload as { status?: unknown; version?: unknown };
+      cb({
+        status: typeof status === 'string' ? status : 'idle',
+        version: typeof version === 'string' ? version : null,
+      });
+    };
+    ipcRenderer.on('app:update-status', listener);
+    return (): void => {
+      ipcRenderer.off('app:update-status', listener);
+    };
+  },
   window: {
     minimize: (): void => {
       ipcRenderer.send('window:minimize');

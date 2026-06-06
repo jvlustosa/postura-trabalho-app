@@ -26,6 +26,8 @@ const defaultThresholds: PostureThresholds = {
   hunchSignificantDeficit: 0.03,
   hunchCompositeWarning: 0.04,
   hunchCompositeBad: 0.075,
+  neckRotationWarning: 0.30,
+  neckRotationBad: 0.52,
 };
 
 const MIN_SHOULDER_WIDTH = 0.04;
@@ -46,6 +48,7 @@ const zeroMetrics: PostureAnalysis['metrics'] = {
   headOffset: 0,
   shoulderTilt: 0,
   neckTilt: 0,
+  neckRotation: 0,
   shoulderWidth: 0,
   torsoAspectRatio: 0,
   headVerticalRatio: 0,
@@ -88,8 +91,9 @@ export const analyzePosture = (
   const hipCenterY = hipsVisible ? (leftHip!.y + rightHip!.y) / 2 : shoulderCenterY;
   const torsoCenterX = (shoulderCenterX + hipCenterX) / 2;
 
-  const earsVisible =
-    isVisible(leftEar, thresholds.minVisibility) && isVisible(rightEar, thresholds.minVisibility);
+  const leftEarVisible = isVisible(leftEar, thresholds.minVisibility);
+  const rightEarVisible = isVisible(rightEar, thresholds.minVisibility);
+  const earsVisible = leftEarVisible && rightEarVisible;
   const earCenterX = earsVisible ? (leftEar!.x + rightEar!.x) / 2 : nose.x;
   const earCenterY = earsVisible ? (leftEar!.y + rightEar!.y) / 2 : nose.y;
 
@@ -104,6 +108,21 @@ export const analyzePosture = (
     : hipsVisible
       ? Math.abs(nose.x - shoulderCenterX)
       : 0;
+
+  // Neck rotation (yaw): how far the nose sits from the midpoint between both ears,
+  // normalised by shoulder width. When facing forward nose ≈ ear midpoint → ~0.
+  // When the head turns toward a side monitor the nose departs from ear mid while
+  // the ear mid itself shifts less, driving the ratio up. If one ear disappears the
+  // head has already rotated significantly so we apply a base penalty plus the
+  // nose-to-shoulder-centre offset.
+  let neckRotation = 0;
+  if (earsVisible) {
+    const earMidX = (leftEar!.x + rightEar!.x) / 2;
+    neckRotation = Math.abs(nose.x - earMidX) / shoulderWidth;
+  } else if (leftEarVisible !== rightEarVisible) {
+    const noseOffset = Math.abs(nose.x - shoulderCenterX) / shoulderWidth;
+    neckRotation = Math.min(1, 0.45 + noseOffset * 0.4);
+  }
 
   // Torso aspect ratio (only when hips visible)
   const torsoAspectRatio = hipsVisible
@@ -126,6 +145,11 @@ export const analyzePosture = (
   if (neckTilt >= thresholds.neckWarning) {
     reasons.push('neck-tilt');
     severity = Math.max(severity, neckTilt >= thresholds.neckBad ? 2 : 1);
+  }
+
+  if (neckRotation >= thresholds.neckRotationWarning) {
+    reasons.push('neck-rotation');
+    severity = Math.max(severity, neckRotation >= thresholds.neckRotationBad ? 2 : 1);
   }
 
   // Slouch via shoulder narrowing (works without hips; primary detection)
@@ -221,6 +245,7 @@ export const analyzePosture = (
     'head-forward': 12,
     'shoulder-tilt': 12,
     'neck-tilt': 12,
+    'neck-rotation': 18,
     'head-down': 18,
     slouch: 25,
   };
@@ -256,6 +281,7 @@ export const analyzePosture = (
       headOffset,
       shoulderTilt,
       neckTilt,
+      neckRotation,
       shoulderWidth,
       torsoAspectRatio,
       headVerticalRatio,
