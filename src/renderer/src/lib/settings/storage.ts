@@ -221,7 +221,17 @@ const readFromLocalStorage = (): AppSettings => {
   if (typeof window === 'undefined' || !window.localStorage) return defaultSettings;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? parseSettings(JSON.parse(raw)) : defaultSettings;
+    const settings = raw ? parseSettings(JSON.parse(raw)) : defaultSettings;
+    // Linux v4l2 gives exclusive camera access in continuous mode, blocking other apps.
+    // Migrate silently to shared mode when running on Linux.
+    if (
+      typeof window !== 'undefined' &&
+      window.postureApp?.platform === 'linux' &&
+      settings.cameraMode === 'continuous'
+    ) {
+      return { ...settings, cameraMode: 'shared' };
+    }
+    return settings;
   } catch {
     return defaultSettings;
   }

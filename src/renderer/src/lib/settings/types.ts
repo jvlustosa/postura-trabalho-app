@@ -75,7 +75,7 @@ export const defaultSettings: AppSettings = {
   compactMode: false,
   autoStartMode: 'off',
   schedule: defaultSchedule,
-  cameraMode: 'continuous',
-  sharedCheckIntervalSeconds: 30,
+  cameraMode: 'shared',
+  sharedCheckIntervalSeconds: 20,
   cameraDeviceId: null,
 };

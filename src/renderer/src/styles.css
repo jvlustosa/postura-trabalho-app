@@ -1261,6 +1261,12 @@ p {
   filter: drop-shadow(0 0 2px rgba(255, 107, 107, 0.6));
 }
 
+.sparkline--away {
+  opacity: 0.4;
+  filter: grayscale(0.6);
+  transition: opacity 400ms ease, filter 400ms ease;
+}
+
 .evaluation {
   display: flex;
   flex-direction: column;
@@ -2866,6 +2872,87 @@ p {
   flex-direction: column;
   gap: 6px;
   min-width: 180px;
+}
+
+/* ── Quality Chart ─────────────────────────────────── */
+
+.quality-chart {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.quality-chart--empty {
+  height: 80px;
+}
+
+.quality-chart__svg {
+  display: block;
+  width: 100%;
+  flex: 1;
+  overflow: visible;
+}
+
+.quality-chart__grid {
+  stroke: var(--md-sys-color-outline-variant);
+  stroke-width: 0.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+}
+
+.quality-chart__area {
+  fill: url(#qc-fill);
+}
+
+.quality-chart__line {
+  fill: none;
+  stroke: var(--md-sys-color-primary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.quality-chart__dot {
+  fill: var(--md-sys-color-primary);
+  stroke: var(--md-sys-color-surface-container-low);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.quality-chart__axis {
+  position: relative;
+  height: 18px;
+  margin-top: 4px;
+}
+
+.quality-chart__tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.quality-chart__tick--start {
+  transform: none;
+}
+
+.quality-chart__tick--end {
+  transform: translateX(-100%);
+}
+
+.quality-chart__y-label {
+  font-size: 6px;
+  fill: var(--md-sys-color-on-surface-variant);
+  text-anchor: end;
+  dominant-baseline: alphabetic;
+  opacity: 0.65;
+  vector-effect: non-scaling-stroke;
 }
 
 .timeline-chart__tooltip strong {

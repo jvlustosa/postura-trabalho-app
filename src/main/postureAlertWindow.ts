@@ -2,22 +2,29 @@ import { BrowserWindow, screen } from 'electron';
 
 export type AlertLevel = 'warning' | 'bad';
 
-const ALERT_WIDTH = 380;
-const ALERT_HEIGHT = 148;
-const ALERT_MARGIN = 24;
+const ALERT_WIDTH = 360;
+const ALERT_HEIGHT = 110;
+const ALERT_MARGIN = 20;
 
 let alertWindow: BrowserWindow | null = null;
 
-const themes: Record<AlertLevel, { gradient: string; icon: string; title: string }> = {
+const themes: Record<
+  AlertLevel,
+  { bg: string; accent: string; iconBg: string; icon: string; title: string }
+> = {
   warning: {
-    gradient: 'linear-gradient(135deg, rgba(180, 130, 20, 0.97), rgba(120, 80, 0, 0.97))',
+    bg: 'rgba(28, 22, 8, 0.95)',
+    accent: '#f59e0b',
+    iconBg: 'rgba(245, 158, 11, 0.18)',
     icon: '🔔',
     title: 'Atenção à postura',
   },
   bad: {
-    gradient: 'linear-gradient(135deg, rgba(186, 26, 26, 0.97), rgba(120, 0, 5, 0.97))',
+    bg: 'rgba(28, 8, 8, 0.95)',
+    accent: '#ef4444',
+    iconBg: 'rgba(239, 68, 68, 0.18)',
     icon: '⚠️',
-    title: 'Hora de ajustar a postura',
+    title: 'Hora de corrigir',
   },
 };
 
@@ -39,15 +46,15 @@ const buildHtml = (level: AlertLevel, message: string): string => {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
     <title>Postura</title>
     <style>
-      :root {
-        color-scheme: dark;
-      }
+      :root { color-scheme: dark; }
+      *, *::before, *::after { box-sizing: border-box; }
       html, body {
         margin: 0;
+        padding: 0;
         height: 100%;
         overflow: hidden;
         font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
-        color: #f7fafa;
+        color: #f1f5f9;
         background: transparent;
         -webkit-user-select: none;
         user-select: none;
@@ -55,86 +62,112 @@ const buildHtml = (level: AlertLevel, message: string): string => {
       }
       body {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 10px;
         -webkit-app-region: drag;
       }
+      @keyframes slide-in {
+        from { opacity: 0; transform: translateX(32px) scale(0.97); }
+        to   { opacity: 1; transform: translateX(0)    scale(1);    }
+      }
       .card {
-        width: 100%;
-        height: 100%;
-        display: grid;
-        grid-template-columns: 56px 1fr auto;
+        flex: 1;
+        display: flex;
         align-items: center;
-        gap: 14px;
-        padding: 16px 18px;
-        border-radius: 18px;
-        background: ${theme.gradient};
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+        gap: 12px;
+        padding: 14px 14px 14px 16px;
+        border-radius: 14px;
+        background: ${theme.bg};
+        border: 1px solid rgba(255,255,255,0.08);
+        border-top: 2px solid ${theme.accent};
+        box-shadow:
+          0 4px 6px rgba(0,0,0,0.3),
+          0 12px 32px rgba(0,0,0,0.4),
+          inset 0 1px 0 rgba(255,255,255,0.06);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        animation: slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
       }
       .icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.14);
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: ${theme.iconBg};
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 22px;
       }
       .copy {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        line-height: 1.3;
+        gap: 2px;
+        min-width: 0;
+        line-height: 1.35;
       }
       .title {
-        font-size: 15px;
+        font-size: 13px;
         font-weight: 600;
+        color: #f8fafc;
         letter-spacing: 0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .body {
-        font-size: 13px;
-        opacity: 0.88;
+        font-size: 12px;
+        color: rgba(241,245,249,0.72);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .dismiss {
         -webkit-app-region: no-drag;
+        flex-shrink: 0;
         appearance: none;
-        border: none;
-        background: rgba(255, 255, 255, 0.16);
-        color: #fff;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.08);
+        color: rgba(241,245,249,0.85);
         font: inherit;
-        font-size: 12px;
-        font-weight: 500;
-        padding: 8px 12px;
-        border-radius: 999px;
+        font-size: 18px;
+        line-height: 1;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        transition: background 160ms ease;
+        transition: background 140ms ease, border-color 140ms ease;
+        align-self: flex-start;
       }
       .dismiss:hover {
-        background: rgba(255, 255, 255, 0.28);
+        background: rgba(255,255,255,0.16);
+        border-color: rgba(255,255,255,0.25);
+        color: #fff;
       }
       .dismiss:focus-visible {
-        outline: 2px solid #fff;
+        outline: 2px solid ${theme.accent};
         outline-offset: 2px;
       }
     </style>
   </head>
   <body>
-    <div class="card" role="alertdialog" aria-labelledby="title" aria-describedby="body">
+    <div class="card" role="alertdialog" aria-labelledby="al-title" aria-describedby="al-body">
       <div class="icon" aria-hidden="true">${theme.icon}</div>
       <div class="copy">
-        <span id="title" class="title">${theme.title}</span>
-        <span id="body" class="body">${safeMessage}</span>
+        <span id="al-title" class="title">${theme.title}</span>
+        <span id="al-body"  class="body">${safeMessage}</span>
       </div>
-      <button id="dismiss" class="dismiss" type="button">Ok</button>
+      <button id="dismiss" class="dismiss" type="button" title="Fechar" aria-label="Fechar">&#x2715;</button>
     </div>
     <script>
       document.getElementById('dismiss').addEventListener('click', () => window.close());
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' || event.key === 'Enter') {
-          window.close();
-        }
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Enter') window.close();
       });
     </script>
   </body>

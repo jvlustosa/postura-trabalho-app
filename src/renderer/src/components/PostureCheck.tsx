@@ -1075,8 +1075,8 @@ export const PostureCheck = ({
             <span className="streak-pill__time">{formatStreak(streakMs)}</span>
           </div>
         ) : null}
-        {isActive && scoreHistory.length >= 2 ? (
-          <div className="sparkline" aria-hidden="true">
+        {(isActive || isAway) && scoreHistory.length >= 2 ? (
+          <div className={`sparkline${isAway ? ' sparkline--away' : ''}`} aria-hidden="true">
             <svg viewBox="0 0 100 24" preserveAspectRatio="none">
               {buildSparklineSegments(scoreHistory, 100, 24).map((segment, i) => (
                 <line
