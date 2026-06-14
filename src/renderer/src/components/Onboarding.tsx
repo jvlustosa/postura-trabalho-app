@@ -1,5 +1,6 @@
 import { type ReactElement, useCallback, useState } from 'react';
 
+import { Button } from '../design-system/atoms';
 import { CalibrationStep } from './CalibrationStep';
 import { ScreenHeightPicker } from './ScreenHeightPicker';
 import type { AppSettings, CalibrationData, SensitivityLevel } from '../lib/settings/types';
@@ -71,14 +72,9 @@ export const Onboarding = ({
   return (
     <section className="onboarding-m" aria-live="polite">
       <div className="onboarding-m__topbar">
-        <button
-          className="button button--text"
-          type="button"
-          onClick={skip}
-          aria-label="Pular onboarding"
-        >
+        <Button variant="text" onClick={skip} aria-label="Pular onboarding">
           Pular
-        </button>
+        </Button>
       </div>
 
       <div className="onboarding-m__body">
@@ -110,9 +106,9 @@ export const Onboarding = ({
         ))}
       </div>
 
-      <button className="button button--filled onboarding-m__cta" type="button" onClick={goNext}>
+      <Button variant="filled" className="onboarding-m__cta" onClick={goNext}>
         {isLast ? (calibration ? 'Começar' : 'Pular calibragem') : 'Continuar'}
-      </button>
+      </Button>
     </section>
   );
 };

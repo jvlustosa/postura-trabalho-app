@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "copy:mediapipe": "node scripts/copy-mediapipe-assets.mjs",
+    "capture:screenshots": "npm run build && node scripts/capture-screenshots.mjs",
     "postura:install": "bash scripts/install-postura-appimage.sh",
     "postura:reinstall": "npm run postura:dist && npm run postura:install",
     "reinstall": "npm run postura:reinstall"
@@ -93,11 +94,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "identity": null,
@@ -111,8 +118,16 @@
       "title": "PosturaCerta ${version}",
       "icon": "build/icon.png",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },
@@ -135,6 +150,7 @@
     "electron-vite": "^5.0.0",
     "eslint": "^10.4.0",
     "jsdom": "^29.1.1",
+    "playwright": "^1.60.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "typescript": "^6.0.3",

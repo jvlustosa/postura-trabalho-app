@@ -20,6 +20,7 @@ import {
   STATE_LABEL,
   type TimelineRange,
 } from '../lib/timeline/format';
+import { Button, SegmentedControl } from '../design-system/atoms';
 import { DonutChart } from './timeline/DonutChart';
 import { QualityChart } from './timeline/QualityChart';
 import { TimelineChart } from './timeline/TimelineChart';
@@ -91,9 +92,9 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
             </p>
           ) : null}
         </div>
-        <button className="button button--text" type="button" onClick={onClose}>
+        <Button variant="text" onClick={onClose}>
           Fechar
-        </button>
+        </Button>
       </header>
 
       {!hasAnyHistory ? (
@@ -131,23 +132,15 @@ export const TimelineView = ({ onClose }: TimelineViewProps): ReactElement => {
             </div>
           </div>
 
-          <div className="segmented" role="radiogroup" aria-label="Janela de tempo">
-            {(Object.keys(RANGE_LABEL) as TimelineRange[]).map((option) => {
-              const isSelected = option === range;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  className={`segmented__option${isSelected ? ' segmented__option--selected' : ''}`}
-                  onClick={() => setRange(option)}
-                >
-                  {RANGE_LABEL[option]}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedControl
+            aria-label="Janela de tempo"
+            value={range}
+            onChange={setRange}
+            options={(Object.keys(RANGE_LABEL) as TimelineRange[]).map((option) => ({
+              value: option,
+              label: RANGE_LABEL[option],
+            }))}
+          />
 
           {hasData ? (
             <>

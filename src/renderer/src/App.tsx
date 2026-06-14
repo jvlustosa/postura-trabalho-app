@@ -28,6 +28,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { TimelineView } from './components/TimelineView';
 import { Tooltip } from './components/Tooltip';
 import { clearSession, loadSession, saveSession } from './lib/session/storage';
+import { applyTheme } from './lib/theme/applyTheme';
 import { formatScheduleSummary } from './lib/settings/formatScheduleSummary';
 import { isWithinSchedule } from './lib/settings/schedule';
 import { decideScheduleAutoStart } from './lib/settings/scheduleAutoStart';
@@ -53,6 +54,13 @@ const formatElapsed = (ms: number): string => {
 
 const initialSession = loadSession();
 
+// O app foi fechado com a análise rodando (não pausada). Nesse caso não dá para
+// confiar no tempo decorrido desde runStartedAt, porque ele inclui o período em
+// que o app ficou fechado. Tratamos como sessão interrompida: congela o tempo e
+// pede para o usuário continuar ou parar.
+const wasInterrupted =
+  initialSession.checkActive && initialSession.runStartedAt !== null;
+
 const MiniApp = (): ReactElement => {
   const { settings, update } = useSettings();
   const [miniView, setMiniView] = useState<Exclude<MiniView, 'off'>>('full');
@@ -60,6 +68,10 @@ const MiniApp = (): ReactElement => {
   useEffect(() => {
     void hydrateTimeline();
   }, []);
+
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
 
   const handleExit = useCallback((): void => {
     window.postureApp?.exitMini?.();
@@ -131,12 +143,16 @@ export const App = (): ReactElement => {
 const MainApp = (): ReactElement => {
   const { settings, update } = useSettings();
   const [view, setView] = useState<View>(
-    initialSession.checkActive && !initialSession.isPaused ? 'active' : 'idle',
+    initialSession.checkActive && !initialSession.isPaused && !wasInterrupted
+      ? 'active'
+      : 'idle',
   );
   const [checkActive, setCheckActive] = useState(initialSession.checkActive);
-  const [isPaused, setIsPaused] = useState(initialSession.isPaused);
+  const [isPaused, setIsPaused] = useState(initialSession.isPaused || wasInterrupted);
+  const [recovered, setRecovered] = useState(wasInterrupted);
   const [miniActive, setMiniActive] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(() => {
+    if (wasInterrupted) return initialSession.accumulatedMs;
     const startedAt = initialSession.runStartedAt;
     return startedAt !== null
       ? initialSession.accumulatedMs + Math.max(0, Date.now() - startedAt)
@@ -145,7 +161,9 @@ const MainApp = (): ReactElement => {
   const previousOnboardingCompleted = useRef<boolean>(settings.onboardingCompleted);
   const autoStartedRef = useRef(initialSession.checkActive);
   const accumulatedMsRef = useRef(initialSession.accumulatedMs);
-  const runStartedAtRef = useRef<number | null>(initialSession.runStartedAt);
+  const runStartedAtRef = useRef<number | null>(
+    wasInterrupted ? null : initialSession.runStartedAt,
+  );
   const [updateStatus, setUpdateStatus] = useState<
     'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
   >('idle');
@@ -164,6 +182,7 @@ const MainApp = (): ReactElement => {
     runStartedAtRef.current = Date.now();
     setElapsedMs(0);
     setIsPaused(false);
+    setRecovered(false);
     setCheckActive(true);
     setView('active');
     saveSession({
@@ -202,6 +221,7 @@ const MainApp = (): ReactElement => {
   const resumeCheck = useCallback((): void => {
     runStartedAtRef.current = Date.now();
     setIsPaused(false);
+    setRecovered(false);
     setView('active');
     saveSession({
       checkActive: true,
@@ -216,15 +236,33 @@ const MainApp = (): ReactElement => {
     runStartedAtRef.current = null;
     setElapsedMs(0);
     setIsPaused(false);
+    setRecovered(false);
     setCheckActive(false);
     setView('idle');
     exitMini();
     clearSession();
   }, [exitMini]);
 
+  // Sessão interrompida (app fechado durante a análise): persiste o estado já
+  // congelado/pausado para que, num próximo fechamento, não se conte o tempo
+  // em que o app ficou fechado.
+  useEffect(() => {
+    if (!wasInterrupted) return;
+    saveSession({
+      checkActive: true,
+      isPaused: true,
+      accumulatedMs: accumulatedMsRef.current,
+      runStartedAt: null,
+    });
+  }, []);
+
   useEffect(() => {
     void hydrateTimeline();
   }, []);
+
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
 
   useEffect(() => {
     const off = window.postureApp?.onMiniActive?.((active) => {
@@ -305,7 +343,20 @@ const MainApp = (): ReactElement => {
     const id = window.setInterval(() => {
       const startedAt = runStartedAtRef.current;
       if (startedAt === null) return;
-      setElapsedMs(accumulatedMsRef.current + (Date.now() - startedAt));
+      const now = Date.now();
+      const next = accumulatedMsRef.current + (now - startedAt);
+      // Rola o acumulado a cada tick e persiste, para que um fechamento
+      // inesperado deixe registrado o tempo realmente decorrido (e não o
+      // período em que o app ficou fechado).
+      accumulatedMsRef.current = next;
+      runStartedAtRef.current = now;
+      setElapsedMs(next);
+      saveSession({
+        checkActive: true,
+        isPaused: false,
+        accumulatedMs: next,
+        runStartedAt: now,
+      });
     }, 1000);
     return () => window.clearInterval(id);
   }, [checkActive, isPaused]);
@@ -515,6 +566,7 @@ const MainApp = (): ReactElement => {
             isPaused ? (
               <PausedPanel
                 elapsedMs={elapsedMs}
+                recovered={recovered}
                 onResume={resumeCheck}
                 onStop={stopCheck}
               />
@@ -750,18 +802,24 @@ const RunningPanel = ({
 
 const PausedPanel = ({
   elapsedMs,
+  recovered = false,
   onResume,
   onStop,
 }: {
   elapsedMs: number;
+  recovered?: boolean;
   onResume: () => void;
   onStop: () => void;
 }): ReactElement => (
   <section className="idle-card">
     <header className="idle-card__header">
-      <h2 className="idle-card__title">Análise pausada</h2>
+      <h2 className="idle-card__title">
+        {recovered ? 'Você fechou com a análise rodando' : 'Análise pausada'}
+      </h2>
       <p className="idle-card__copy">
-        A câmera foi liberada. Clique em continuar quando estiver pronto para retomar.
+        {recovered
+          ? 'Pausamos o cronômetro no último tempo registrado. Continue de onde parou ou pare por aqui.'
+          : 'A câmera foi liberada. Clique em continuar quando estiver pronto para retomar.'}
       </p>
       <p className="idle-card__elapsed idle-card__elapsed--paused" aria-live="polite">
         <Pause size={16} aria-hidden="true" />

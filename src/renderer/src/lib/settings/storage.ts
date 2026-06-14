@@ -10,6 +10,7 @@ import {
   type ScheduleConfig,
   type SensitivityLevel,
   type SharedCheckIntervalSeconds,
+  type ThemePreference,
   type Weekday,
 } from './types';
 
@@ -22,6 +23,7 @@ const autoStartModeValues: readonly AutoStartMode[] = ['off', 'on-launch', 'sche
 const weekdayValues: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 const cameraModeValues: readonly CameraMode[] = ['continuous', 'shared'];
 const sharedIntervalValues: readonly SharedCheckIntervalSeconds[] = [20, 30, 60, 120];
+const themeValues: readonly ThemePreference[] = ['light', 'dark'];
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -197,6 +199,9 @@ const parseSettings = (raw: unknown): AppSettings => {
       typeof c.cameraDeviceId === 'string' && c.cameraDeviceId.length > 0
         ? c.cameraDeviceId
         : defaultSettings.cameraDeviceId,
+    theme: themeValues.includes(c.theme as ThemePreference)
+      ? (c.theme as ThemePreference)
+      : defaultSettings.theme,
   };
 };
 

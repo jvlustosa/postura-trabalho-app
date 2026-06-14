@@ -60,6 +60,8 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
         color: inherit;
         text-align: left;
         cursor: pointer;
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
         background: var(--card-bg);
         box-shadow:
           0 12px 28px rgba(0, 0, 0, 0.45),
@@ -175,12 +177,6 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
         0%, 100% { opacity: 0.45; transform: scale(0.85); }
         50% { opacity: 1; transform: scale(1.05); }
       }
-      .drag {
-        position: absolute;
-        inset: 0;
-        -webkit-app-region: drag;
-        pointer-events: none;
-      }
       .tooltip {
         position: fixed;
         left: 50%;
@@ -230,7 +226,6 @@ const buildHtml = (initialOpacity: number): string => `<!doctype html>
       </span>
       <span class="tooltip" id="tooltip" role="tooltip">Clique para abrir o app · Botão direito para mais opções</span>
     </div>
-    <div class="drag" aria-hidden="true"></div>
     <script>
       var SCORE_STATES = ['good', 'warning', 'bad'];
       var META_FALLBACK = {

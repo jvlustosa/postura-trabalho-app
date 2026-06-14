@@ -19,6 +19,7 @@ import type { PostureAnalysis, PostureState, PostureThresholds } from '../lib/po
 import { sensitivityMultiplier } from '../lib/settings/sensitivityMultiplier';
 import type { AppSettings, CalibrationData } from '../lib/settings/types';
 import { createTimelineRecorder } from '../lib/timeline/createTimelineRecorder';
+import { Button, IconButton } from '../design-system/atoms';
 import { Tooltip } from './Tooltip';
 
 interface PostureCheckProps {
@@ -95,6 +96,10 @@ const statusLabels: Record<PostureState, string> = {
 const AWAY_GRACE_MS = 800;
 const SHARED_SAMPLE_WINDOW_MS = 5_000;
 const SHARED_WARMUP_FRAMES = 4;
+// When the webcam is busy (another app like the browser grabbed it), keep
+// retrying quietly on this cadence so we never block the other app and resume
+// on our own once the camera is free again.
+const CAMERA_BUSY_RETRY_MS = 5_000;
 
 type CycleState = 'continuous' | 'warmup' | 'sampling' | 'idle';
 
@@ -234,6 +239,7 @@ export const PostureCheck = ({
   const warmupFramesRef = useRef(0);
   const sampleStartedAtRef = useRef<number | null>(null);
   const idleTimeoutRef = useRef<number | null>(null);
+  const busyRetryTimeoutRef = useRef<number | null>(null);
   const idleUntilRef = useRef<number | null>(null);
   const restartCameraRef = useRef<(() => void) | null>(null);
 
@@ -693,6 +699,20 @@ export const PostureCheck = ({
       setCameraBusyPaused(true);
       setAnalysis({ ...initialAnalysis, state: 'camera-error', message });
       pushFloating('camera-error', 0, 'Câmera ocupada');
+      // Yield to the other app and keep checking quietly. As soon as the camera
+      // is free again, start() succeeds and clears the busy state on its own, so
+      // the user never has to click Retomar just because they opened the browser.
+      if (busyRetryTimeoutRef.current !== null) {
+        window.clearTimeout(busyRetryTimeoutRef.current);
+      }
+      busyRetryTimeoutRef.current = window.setTimeout(() => {
+        busyRetryTimeoutRef.current = null;
+        if (cancelled) return;
+        cycleStateRef.current = cameraModeRef.current === 'shared' ? 'sampling' : 'continuous';
+        warmupFramesRef.current = 0;
+        sampleStartedAtRef.current = null;
+        void start();
+      }, CAMERA_BUSY_RETRY_MS);
     };
 
     const start = async (): Promise<void> => {
@@ -711,7 +731,7 @@ export const PostureCheck = ({
 
         if (kind === 'camera-in-use') {
           enterBusyPaused(
-            'Câmera em uso por outro app (ex.: Google Meet). Clique em Retomar quando a reunião acabar.',
+            'Câmera em uso por outro app (ex.: Google Meet ou navegador). A análise volta sozinha quando a câmera ficar livre.',
           );
           return;
         }
@@ -734,7 +754,7 @@ export const PostureCheck = ({
           console.warn('[posture-check] camera track ended — another app took the camera');
           stopStream();
           enterBusyPaused(
-            'Outro app pegou a câmera (ex.: Google Meet). Clique em Retomar quando estiver livre.',
+            'Outro app pegou a câmera (ex.: Google Meet ou navegador). A análise volta sozinha assim que ela ficar livre.',
           );
         };
       });
@@ -779,6 +799,7 @@ export const PostureCheck = ({
       if (!cancelled) {
         diagnosticCaptureRef.current = {};
         setErrorDetails(null);
+        setCameraBusyPaused(false);
         if (!isCalibratedRef.current) {
           setAnalysis((c) => ({ ...c, message: 'Calibrando' }));
         }
@@ -791,6 +812,10 @@ export const PostureCheck = ({
       if (idleTimeoutRef.current !== null) {
         window.clearTimeout(idleTimeoutRef.current);
         idleTimeoutRef.current = null;
+      }
+      if (busyRetryTimeoutRef.current !== null) {
+        window.clearTimeout(busyRetryTimeoutRef.current);
+        busyRetryTimeoutRef.current = null;
       }
       idleUntilRef.current = null;
       setSharedIdleUntil(null);
@@ -807,6 +832,10 @@ export const PostureCheck = ({
       if (idleTimeoutRef.current !== null) {
         window.clearTimeout(idleTimeoutRef.current);
         idleTimeoutRef.current = null;
+      }
+      if (busyRetryTimeoutRef.current !== null) {
+        window.clearTimeout(busyRetryTimeoutRef.current);
+        busyRetryTimeoutRef.current = null;
       }
       idleUntilRef.current = null;
       setSharedIdleUntil(null);
@@ -992,31 +1021,25 @@ export const PostureCheck = ({
           <h2>{statusLabels[analysis.state]}</h2>
         </div>
         <div className="posture-header__actions">
-          <button
-            className="icon-button"
-            type="button"
+          <IconButton
+            icon={RotateCcw}
             aria-label="Recalibrar"
             onClick={recalibrate}
             disabled={!isCalibratedRef.current}
-          >
-            <RotateCcw size={20} aria-hidden="true" />
-          </button>
+          />
           <Tooltip
             label="Reduz a janela e mantém o monitor de postura visível por cima dos outros apps"
             placement="bottom"
           >
-            <button
-              className="icon-button"
-              type="button"
+            <IconButton
+              icon={PictureInPicture2}
               aria-label="Reduzir para janela flutuante"
               onClick={() => onChangeMiniView?.('full')}
-            >
-              <PictureInPicture2 size={20} aria-hidden="true" />
-            </button>
+            />
           </Tooltip>
-          <button className="button button--text" type="button" onClick={onStop}>
+          <Button variant="text" onClick={onStop}>
             Pausar
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1118,13 +1141,13 @@ export const PostureCheck = ({
           <p className="error-note__message">{analysis.message}</p>
           <div className="error-note__actions">
             {cameraBusyPaused ? (
-              <button type="button" className="button button--filled" onClick={resumeFromBusy}>
+              <Button variant="filled" onClick={resumeFromBusy}>
                 Retomar
-              </button>
+              </Button>
             ) : (
-              <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
+              <Button variant="filled" onClick={() => void copyDetailedLogs()}>
                 Copiar logs detalhados
-              </button>
+              </Button>
             )}
             {copyDiagFeedback === 'copied' ? (
               <span className="error-note__feedback" aria-live="polite">
@@ -1141,15 +1164,14 @@ export const PostureCheck = ({
             <details className="error-note__details">
               <summary>Resumo do erro (copiar)</summary>
               <pre className="error-note__pre">{errorDetails}</pre>
-              <button
-                type="button"
-                className="button button--text"
+              <Button
+                variant="text"
                 onClick={() => {
                   void navigator.clipboard?.writeText(errorDetails).catch(() => undefined);
                 }}
               >
                 Copiar resumo
-              </button>
+              </Button>
             </details>
           ) : null}
         </div>

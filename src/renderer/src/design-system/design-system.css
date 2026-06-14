@@ -1,0 +1,426 @@
+/*
+ * PosturaCerta design system — atoms layer.
+ * All visuals reference existing MD3 tokens (var(--md-sys-color-*), --md-shape-*, --md-elev-*).
+ * No hardcoded colors. Mirrors the legacy .button/.icon-button/.switch/.segmented/.card visuals.
+ */
+
+/* ---------------------------------------------------------------- Button */
+
+.ds-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    box-shadow 200ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 200ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-button:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.ds-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+  box-shadow: none;
+}
+
+.ds-button--sm {
+  min-height: 32px;
+  padding: 0 16px;
+  font-size: 0.8125rem;
+}
+
+.ds-button--full {
+  width: 100%;
+}
+
+.ds-button--filled {
+  color: var(--md-sys-color-on-primary);
+  background: var(--md-sys-color-primary);
+}
+
+.ds-button--filled:hover:not(:disabled) {
+  box-shadow: var(--md-elev-1);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 92%, white);
+}
+
+.ds-button--filled:active:not(:disabled) {
+  box-shadow: none;
+}
+
+.ds-button--tonal {
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+}
+
+.ds-button--tonal:hover:not(:disabled) {
+  box-shadow: var(--md-elev-1);
+}
+
+.ds-button--text {
+  padding: 0 12px;
+  color: var(--md-sys-color-primary);
+  background: transparent;
+}
+
+.ds-button--text.ds-button--sm {
+  padding: 0 8px;
+}
+
+.ds-button--text:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.ds-button--outlined {
+  color: var(--md-sys-color-primary);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+}
+
+.ds-button--outlined:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.ds-button__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------ IconButton */
+
+.ds-icon-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  color: var(--md-sys-color-primary);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-icon-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+
+.ds-icon-button:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.ds-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.ds-icon-button--sm {
+  width: 32px;
+  height: 32px;
+}
+
+.ds-icon-button[aria-pressed='true'] {
+  color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+}
+
+/* ---------------------------------------------------------------- Switch */
+
+.ds-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid var(--md-sys-color-outline);
+  border-radius: 9999px;
+  background: var(--md-sys-color-surface-container-highest);
+  cursor: pointer;
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-switch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--md-sys-color-outline);
+  transform: translateY(-50%);
+  transition:
+    left 200ms cubic-bezier(0.2, 0, 0, 1),
+    width 200ms cubic-bezier(0.2, 0, 0, 1),
+    height 200ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-switch[aria-checked='true'] {
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+
+.ds-switch[aria-checked='true'] .ds-switch__thumb {
+  left: 26px;
+  width: 22px;
+  height: 22px;
+  background: var(--md-sys-color-on-primary);
+}
+
+.ds-switch:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.ds-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+/* ------------------------------------------------------- SegmentedControl */
+
+.ds-segmented {
+  display: flex;
+  width: 100%;
+  border-radius: 9999px;
+  border: 1px solid var(--md-sys-color-outline);
+  overflow: hidden;
+}
+
+.ds-segmented__option {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background-color 150ms cubic-bezier(0.2, 0, 0, 1),
+    color 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ds-segmented__option + .ds-segmented__option {
+  border-left: 1px solid var(--md-sys-color-outline);
+}
+
+.ds-segmented__option:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.ds-segmented__option[aria-checked='true'] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.ds-segmented__option:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+.ds-segmented__option:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+/* ----------------------------------------------------------- Card/Surface */
+
+.ds-surface {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-shape-lg);
+}
+
+.ds-surface--sm {
+  border-radius: var(--md-shape-md);
+}
+
+.ds-surface--lg {
+  border-radius: var(--md-shape-xl);
+}
+
+.ds-surface--elevated {
+  box-shadow: var(--md-elev-1);
+}
+
+.ds-surface--elevated-2 {
+  box-shadow: var(--md-elev-2);
+}
+
+.ds-surface--outlined {
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.ds-card {
+  padding: 24px;
+}
+
+/* ----------------------------------------------------------------- Badge */
+
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.ds-badge--neutral {
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.ds-badge--success {
+  color: var(--md-sys-color-success);
+  background: color-mix(in srgb, var(--md-sys-color-success) 16%, transparent);
+}
+
+.ds-badge--warning {
+  color: var(--md-sys-color-warning);
+  background: color-mix(in srgb, var(--md-sys-color-warning) 16%, transparent);
+}
+
+.ds-badge--error {
+  color: var(--md-sys-color-error);
+  background: var(--md-sys-color-error-container);
+}
+
+/* ------------------------------------------------------- Text / Heading */
+
+.ds-text {
+  margin: 0;
+  font-family: inherit;
+  color: var(--md-sys-color-on-surface);
+}
+
+.ds-text--body {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.ds-text--body-sm {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.ds-text--label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ds-text--eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.ds-heading {
+  margin: 0;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--md-sys-color-on-surface);
+}
+
+.ds-heading--1 {
+  font-size: 1.75rem;
+}
+
+.ds-heading--2 {
+  font-size: 1.375rem;
+}
+
+.ds-heading--3 {
+  font-size: 1.125rem;
+}
+
+.ds-tone--default {
+  color: var(--md-sys-color-on-surface);
+}
+
+.ds-tone--muted {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.ds-tone--primary {
+  color: var(--md-sys-color-primary);
+}
+
+.ds-tone--success {
+  color: var(--md-sys-color-success);
+}
+
+.ds-tone--warning {
+  color: var(--md-sys-color-warning);
+}
+
+.ds-tone--error {
+  color: var(--md-sys-color-error);
+}
+
+/* ----------------------------------------------------------- Stack / Row */
+
+.ds-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.ds-row--wrap {
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------- Spinner */
+
+.ds-spinner {
+  display: inline-block;
+  border-radius: 9999px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);
+  border-top-color: var(--md-sys-color-primary);
+  animation: ds-spinner-spin 700ms linear infinite;
+}
+
+@keyframes ds-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-spinner {
+    animation-duration: 1400ms;
+  }
+}

@@ -34,4 +34,15 @@ export default tseslint.config(
       },
     },
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        // Referenced inside Playwright page.evaluate callbacks (browser context).
+        window: 'readonly',
+      },
+    },
+  },
 );

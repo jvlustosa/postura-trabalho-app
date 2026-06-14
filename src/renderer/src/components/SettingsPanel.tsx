@@ -14,11 +14,14 @@ import {
   Clock,
   Download,
   Focus,
+  Moon,
   Settings2,
   Shield,
+  Sun,
   Trash2,
 } from 'lucide-react';
 
+import { SegmentedControl, type SegmentedOption } from '../design-system/atoms';
 import { ScreenHeightPicker } from './ScreenHeightPicker';
 import { useConfirm } from './ConfirmDialog';
 import { playAlertTone } from '../lib/alerts/playAlertTone';
@@ -31,6 +34,7 @@ import type {
   CameraMode,
   SensitivityLevel,
   SharedCheckIntervalSeconds,
+  ThemePreference,
   Weekday,
 } from '../lib/settings/types';
 
@@ -81,6 +85,11 @@ const weekdayLabels: Record<Weekday, string> = {
 };
 
 const weekdayOrder: Weekday[] = [1, 2, 3, 4, 5, 6, 0];
+
+const themeOptions: ReadonlyArray<SegmentedOption<ThemePreference>> = [
+  { value: 'light', label: 'Claro', icon: Sun },
+  { value: 'dark', label: 'Escuro', icon: Moon },
+];
 
 export const SettingsPanel = ({
   settings,
@@ -546,6 +555,21 @@ export const SettingsPanel = ({
       </SettingsSection>
 
       <SettingsSection icon={Settings2} title="Aplicativo" hint="Comportamento geral.">
+        <div className="settings-group" role="group" aria-label="Tema">
+          <div className="settings-group__head">
+            <span className="settings-group__label">Tema</span>
+            <span className="settings-group__hint">
+              Escolha entre o visual claro ou escuro do app.
+            </span>
+          </div>
+          <SegmentedControl
+            aria-label="Tema do aplicativo"
+            options={themeOptions}
+            value={settings.theme}
+            onChange={(next) => onChange({ theme: next })}
+          />
+        </div>
+
         <div className="settings-row settings-row--action">
           <div className="settings-row__text">
             <span className="settings-row__label">Refazer onboarding</span>

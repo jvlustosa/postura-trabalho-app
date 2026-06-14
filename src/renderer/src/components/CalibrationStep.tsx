@@ -2,6 +2,8 @@ import { type ReactElement, useCallback, useEffect, useRef, useState } from 'rea
 import { Camera, ShieldCheck } from 'lucide-react';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
+import { Button } from '../design-system/atoms';
+
 import { buildCameraDiagnosticReport } from '../lib/media/buildCameraDiagnosticReport';
 import { classifyMediaError, formatMediaErrorDetails } from '../lib/media/classifyMediaError';
 import { createPoseLandmarker } from '../lib/pose/createPoseLandmarker';
@@ -425,9 +427,9 @@ export const CalibrationStep = ({
       {phase === 'error' ? (
         <>
           <div className="calibration-step__diag-actions">
-            <button type="button" className="button button--filled" onClick={() => void copyDetailedLogs()}>
+            <Button variant="filled" onClick={() => void copyDetailedLogs()}>
               Copiar logs detalhados
-            </button>
+            </Button>
             {copyDiagFeedback === 'copied' ? (
               <span className="calibration-step__diag-feedback" aria-live="polite">
                 Copiado para a área de transferência
@@ -443,15 +445,14 @@ export const CalibrationStep = ({
             <details className="calibration-step__error-details">
               <summary>Resumo do erro (copiar)</summary>
               <pre className="calibration-step__error-pre">{errorDetails}</pre>
-              <button
-                type="button"
-                className="button button--text"
+              <Button
+                variant="text"
                 onClick={() => {
                   void navigator.clipboard?.writeText(errorDetails).catch(() => undefined);
                 }}
               >
                 Copiar resumo
-              </button>
+              </Button>
             </details>
           ) : null}
         </>
@@ -467,19 +468,18 @@ export const CalibrationStep = ({
 
       <div className="calibration-step__actions">
         {phase === 'consent' ? (
-          <button className="button button--filled" type="button" onClick={beginCalibration}>
-            <ShieldCheck size={18} aria-hidden="true" />
+          <Button variant="filled" icon={ShieldCheck} onClick={beginCalibration}>
             Permitir câmera e começar
-          </button>
+          </Button>
         ) : null}
         {phase === 'error' && errorCopy.retryable ? (
-          <button className="button button--filled" type="button" onClick={retry}>
+          <Button variant="filled" onClick={retry}>
             Tentar novamente
-          </button>
+          </Button>
         ) : null}
-        <button className="button button--text" type="button" onClick={onSkip}>
+        <Button variant="text" onClick={onSkip}>
           {phase === 'error' ? 'Pular esta etapa' : 'Calibrar depois'}
-        </button>
+        </Button>
       </div>
     </div>
   );

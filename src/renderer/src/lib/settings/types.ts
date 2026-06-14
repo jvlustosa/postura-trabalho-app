@@ -8,6 +8,8 @@ export type AutoStartMode = 'off' | 'on-launch' | 'schedule';
 export type CameraMode = 'continuous' | 'shared';
 export type SharedCheckIntervalSeconds = 20 | 30 | 60 | 120;
 
+export type ThemePreference = 'light' | 'dark';
+
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface ScheduleConfig {
@@ -50,6 +52,7 @@ export interface AppSettings {
   cameraMode: CameraMode;
   sharedCheckIntervalSeconds: SharedCheckIntervalSeconds;
   cameraDeviceId: string | null;
+  theme: ThemePreference;
 }
 
 export const defaultSchedule: ScheduleConfig = {
@@ -78,4 +81,5 @@ export const defaultSettings: AppSettings = {
   cameraMode: 'shared',
   sharedCheckIntervalSeconds: 20,
   cameraDeviceId: null,
+  theme: 'dark',
 };

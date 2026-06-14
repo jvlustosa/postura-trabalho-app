@@ -1,0 +1,85 @@
+/* Design system molecules. Composed from atoms; tokens from styles.css. */
+
+.ds-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.ds-setting-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ds-setting-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ds-setting-row__control {
+  flex-shrink: 0;
+}
+
+.ds-setting-row--stacked .ds-setting-row__control {
+  width: 100%;
+}
+
+.ds-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.ds-modal {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ds-modal__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+}
+
+.ds-modal__icon--danger {
+  color: var(--md-sys-color-error);
+  background: var(--md-sys-color-error-container);
+}
+
+.ds-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ds-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-stat-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}

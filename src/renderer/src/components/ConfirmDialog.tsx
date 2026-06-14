@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from '../design-system/atoms';
+import { ModalShell } from '../design-system/molecules';
 
 export interface ConfirmOptions {
   title: string;
@@ -46,44 +48,32 @@ export const ConfirmDialog = ({
   if (!open) return null;
 
   return (
-    <div
-      className="confirm-backdrop"
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <div
-        className="confirm-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-message"
-      >
-        <div className={`confirm-dialog__icon${destructive ? ' confirm-dialog__icon--danger' : ''}`}>
-          <AlertTriangle size={28} aria-hidden="true" />
-        </div>
-        <h2 id="confirm-dialog-title" className="confirm-dialog__title">
-          {title}
-        </h2>
-        <p id="confirm-dialog-message" className="confirm-dialog__message">
-          {message}
-        </p>
-        <div className="confirm-dialog__actions">
-          <button className="button button--text" type="button" onClick={onCancel}>
+    <ModalShell
+      open
+      role="alertdialog"
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-message"
+      icon={AlertTriangle}
+      danger={destructive}
+      title={title}
+      message={message}
+      onBackdropClick={onCancel}
+      actions={
+        <>
+          <Button variant="text" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             ref={confirmRef}
-            className={`button ${destructive ? 'button--danger' : 'button--filled'}`}
-            type="button"
+            variant="filled"
+            className={destructive ? 'button--danger' : undefined}
             onClick={onConfirm}
           >
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    />
   );
 };
 
